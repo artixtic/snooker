@@ -99,7 +99,8 @@ temp/
 
 # Prisma
 # Keep schema.prisma, but ignore generated files
-prisma/migrations/
+# prisma/migrations/ - Keep migrations in repo for deployment
+.prisma/
 
 # TypeScript
 *.tsbuildinfo
