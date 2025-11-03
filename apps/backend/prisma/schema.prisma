@@ -1,0 +1,225 @@
+// Prisma schema for Snooker POS
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MIXED
+}
+
+enum ShiftStatus {
+  ACTIVE
+  CLOSED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // bcrypt hash
+  name      String
+  role      UserRole @default(EMPLOYEE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deleted   Boolean  @default(false)
+
+  // Relations
+  sales          Sale[]
+  shifts         Shift[]
+  inventoryMoves InventoryMovement[]
+  activityLogs   ActivityLog[]
+
+  @@map("users")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  sku             String?  @unique
+  description     String?  @db.Text
+  price           Decimal  @db.Decimal(10, 2)
+  cost            Decimal? @db.Decimal(10, 2)
+  stock           Int      @default(0)
+  category        String?
+  barcode         String?  @unique
+  imageUrl        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deleted         Boolean  @default(false)
+  version         Int      @default(1) // For optimistic locking
+  lastModifiedBy  String?
+
+  // Relations
+  saleItems          SaleItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@map("products")
+  @@index([sku])
+  @@index([barcode])
+  @@index([category])
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  receiptNumber String?       @unique
+  tableId       String?
+  employeeId    String
+  subtotal      Decimal       @db.Decimal(10, 2)
+  discount      Decimal?      @db.Decimal(10, 2)
+  tax           Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  cashReceived  Decimal?      @db.Decimal(10, 2)
+  change        Decimal?      @db.Decimal(10, 2)
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  synced        Boolean       @default(true)
+  clientId      String?
+
+  // Relations
+  employee User       @relation(fields: [employeeId], references: [id])
+  table    TableSession? @relation(fields: [tableId], references: [id])
+  items    SaleItem[]
+
+  @@map("sales")
+  @@index([employeeId])
+  @@index([createdAt])
+  @@index([clientId])
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  discount  Decimal? @db.Decimal(10, 2)
+  tax       Decimal? @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+  notes     String?
+
+  // Relations
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+  @@index([saleId])
+  @@index([productId])
+}
+
+model TableSession {
+  id           String      @id @default(cuid())
+  tableNumber  Int         @unique
+  status       TableStatus @default(AVAILABLE)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  ratePerHour  Decimal     @db.Decimal(10, 2) @default(0)
+  discount     Decimal?    @db.Decimal(10, 2)
+  currentCharge Decimal    @db.Decimal(10, 2) @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  sales Sale[]
+
+  @@map("tables")
+}
+
+model Shift {
+  id             String      @id @default(cuid())
+  employeeId     String
+  startedAt      DateTime    @default(now())
+  endedAt        DateTime?
+  openingCash    Decimal     @db.Decimal(10, 2)
+  closingCash    Decimal?    @db.Decimal(10, 2)
+  status         ShiftStatus @default(ACTIVE)
+  salesTotal     Decimal?    @db.Decimal(10, 2)
+  cashDiscrepancy Decimal?   @db.Decimal(10, 2)
+  notes          String?     @db.Text
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  employee User @relation(fields: [employeeId], references: [id])
+
+  @@map("shifts")
+  @@index([employeeId])
+  @@index([startedAt])
+}
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  productId String
+  change    Int      // positive = increase, negative = decrease
+  reason    String   @db.Text
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@map("inventory_movements")
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model SyncLog {
+  id              Int      @id @default(autoincrement())
+  entity          String   // 'product', 'sale', etc.
+  action          String   // 'create', 'update', 'delete'
+  entityId        String
+  payload         Json
+  clientId        String
+  clientUpdatedAt DateTime
+  serverId        String?  // Server-generated ID after sync
+  serverUpdatedAt DateTime?
+  status          String   @default("pending") // 'pending', 'synced', 'failed', 'conflict'
+  conflictData    Json?
+  error           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  @@map("sync_log")
+  @@index([clientId])
+  @@index([status])
+  @@index([entity, entityId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // 'create', 'update', 'delete', 'login', etc.
+  entity    String   // 'product', 'sale', etc.
+  entityId  String?
+  payload   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+

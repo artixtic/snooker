@@ -1,0 +1,42 @@
+{
+  "name": "@snooker-pos/electron",
+  "version": "1.0.0",
+  "description": "Electron main process for Snooker POS",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron dist/main.js",
+    "build": "tsc",
+    "build:electron": "electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "escpos": "^3.0.0-alpha.6",
+    "electron-updater": "^6.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "electron-builder": "^24.9.1",
+    "typescript": "^5.3.3"
+  },
+  "build": {
+    "appId": "com.snookerpos.app",
+    "productName": "Snooker POS",
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "files": [
+      "dist/**/*",
+      "preload/**/*",
+      "node_modules/**/*"
+    ]
+  }
+}
+
