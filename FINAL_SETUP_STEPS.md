@@ -29,7 +29,7 @@ pnpm add -D @types/cookie-parser
 
 **Backend** (`apps/backend/.env`):
 ```env
-DATABASE_URL="postgresql://snooker_user:snooker_pass@localhost:5432/snooker_pos?schema=public"
+DATABASE_URL="postgresql://postgres:root@localhost:5432/snooker_pos?schema=public"
 JWT_SECRET="your-super-secret-jwt-key-change-in-production"
 JWT_REFRESH_SECRET="your-super-secret-refresh-key-change-in-production"
 JWT_EXPIRES_IN="15m"

@@ -3,9 +3,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { DatabaseInitService } from './prisma/database-init.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Initialize database and run migrations before starting the server
+  const databaseInitService = app.get(DatabaseInitService);
+  await databaseInitService.initialize();
 
   // Cookie parser for refresh tokens
   app.use(cookieParser());
