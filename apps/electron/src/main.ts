@@ -39,6 +39,13 @@ function startBackend() {
     return;
   }
 
+  // In dev mode, backend is already started by npm run dev
+  // Only start it here if we're in production or if explicitly needed
+  if (isDev) {
+    console.log('Backend should be started by npm run dev in development mode');
+    return;
+  }
+
   console.log('Starting backend server...');
   const backendPath = path.join(__dirname, '../../backend/dist/main.js');
   backendProcess = spawn('node', [backendPath], {
@@ -62,17 +69,9 @@ function startFrontend() {
     return;
   }
 
-  console.log('Starting frontend server...');
-  frontendProcess = spawn('npm', ['run', 'dev'], {
-    cwd: path.join(__dirname, '../../frontend'),
-    shell: true,
-    stdio: 'inherit',
-  });
-
-  frontendProcess.on('exit', (code) => {
-    console.log(`Frontend exited with code ${code}`);
-    frontendProcess = null;
-  });
+  // In dev mode, frontend is already started by npm run dev
+  // Only start it here if explicitly needed
+  console.log('Frontend should be started by npm run dev in development mode');
 }
 
 app.whenReady().then(() => {

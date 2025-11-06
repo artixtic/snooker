@@ -11,7 +11,7 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req, @Res({ passthrough: true }) res: Response) {
+  async login(@Request() req: any, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(req.user);
 
     // Set HTTP-only cookies for refresh token
@@ -29,7 +29,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Request() req: any) {
     // Try to get refresh token from cookie first, then body
     const refreshToken = req.cookies?.refreshToken || refreshTokenDto.refreshToken;
     if (!refreshToken) {

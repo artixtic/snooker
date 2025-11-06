@@ -1,22 +1,48 @@
 // ESC/POS printer support
 import { Printer } from 'escpos';
-import escpos from 'escpos';
-// @ts-ignore - escpos types may not be perfect
-escpos.USB = require('escpos-usb');
+// @ts-ignore - Dynamic assignment to escpos module
+const escpos = require('escpos');
+
+// Try to load escpos-usb module (optional - may not be available)
+let escposUSB: any = null;
+try {
+  // @ts-ignore - escpos-usb module
+  escposUSB = require('escpos-usb');
+  if (escposUSB) {
+    escpos.USB = escposUSB;
+  }
+} catch (error) {
+  console.warn('escpos-usb module not available, USB printing will be disabled:', error);
+}
 
 export async function listPrinters(): Promise<any[]> {
   try {
+    // Check if USB support is available
+    if (!escposUSB || !escpos.USB) {
+      console.warn('USB printer support not available');
+      return [];
+    }
+
     // List USB printers
     const devices = await new Promise<any[]>((resolve, reject) => {
+      if (!escpos.USB.findPrinter) {
+        resolve([]);
+        return;
+      }
+
       escpos.USB.findPrinter((err: any, devices: any[]) => {
-        if (err) reject(err);
-        else resolve(devices || []);
+        if (err) {
+          console.warn('Error finding USB printers:', err);
+          resolve([]);
+        } else {
+          resolve(devices || []);
+        }
       });
     });
 
     return devices.map((device, index) => ({
       id: `usb-${index}`,
-      name: device.deviceDescriptor.idVendor || `Printer ${index + 1}`,
+      name: device.deviceDescriptor?.idVendor || `Printer ${index + 1}`,
       type: 'usb',
       device,
     }));
@@ -33,6 +59,12 @@ export async function printReceipt(data: {
 }): Promise<{ success: boolean; message?: string }> {
   return new Promise(async (resolve) => {
     try {
+      // Check if USB support is available
+      if (!escposUSB || !escpos.USB) {
+        resolve({ success: false, message: 'USB printer support not available. Please install escpos-usb module.' });
+        return;
+      }
+
       const devices = await listPrinters();
       if (devices.length === 0) {
         resolve({ success: false, message: 'No printers found' });
@@ -40,6 +72,11 @@ export async function printReceipt(data: {
       }
 
       const selectedDevice = devices.find((d) => d.id === data.printerId) || devices[0];
+      if (!selectedDevice || !selectedDevice.device) {
+        resolve({ success: false, message: 'Selected printer device not available' });
+        return;
+      }
+
       const device = selectedDevice.device;
 
       // Create printer instance

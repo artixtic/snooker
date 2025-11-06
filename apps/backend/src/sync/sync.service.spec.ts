@@ -55,8 +55,8 @@ describe('SyncService', () => {
       mockPrismaService.$transaction.mockImplementation((callback) =>
         callback({
           product: {
-            findUnique: jest.fn().resolvedValue(null),
-            create: jest.fn().resolvedValue({ id: 'server-id-1' }),
+            findUnique: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({ id: 'server-id-1' }),
           },
         }),
       );

@@ -15,11 +15,11 @@ export class SyncService {
     for (const op of operations) {
       try {
         const result = await this.processOperation(op, clientId);
-        if (result.conflict) {
+        if ('conflict' in result && result.conflict) {
           conflicts.push(result.conflict);
         } else {
           processed.push(op.opId);
-          if (result.serverId) {
+          if ('serverId' in result && result.serverId) {
             createdServerIds[op.opId] = result.serverId;
           }
         }
@@ -57,7 +57,7 @@ export class SyncService {
     });
   }
 
-  private async syncProduct(op: any, clientId: string, tx: any) {
+  private async syncProduct(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
     const payload = op.payload;
     const clientUpdatedAt = new Date(op.clientUpdatedAt);
 
@@ -141,7 +141,7 @@ export class SyncService {
     throw new BadRequestException(`Unknown action: ${op.action}`);
   }
 
-  private async syncSale(op: any, clientId: string, tx: any) {
+  private async syncSale(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
     // Sales are append-only - always create new record
     if (op.action !== 'create') {
       throw new BadRequestException('Sale can only be created (append-only)');
@@ -171,7 +171,7 @@ export class SyncService {
     return { serverId: sale.id };
   }
 
-  private async syncInventoryMovement(op: any, clientId: string, tx: any) {
+  private async syncInventoryMovement(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
     if (op.action !== 'create') {
       throw new BadRequestException('Inventory movement can only be created');
     }
@@ -197,7 +197,7 @@ export class SyncService {
     return { serverId: movement.id };
   }
 
-  private async syncTable(op: any, clientId: string, tx: any) {
+  private async syncTable(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
     const payload = op.payload;
 
     if (op.action === 'create' || op.action === 'update') {
@@ -273,15 +273,21 @@ export class SyncService {
 
     for (const record of allRecords) {
       const entityName = record._entity as string;
-      delete record._entity;
+      const { _entity, ...recordData } = record;
+
+      const updatedAt = 'updatedAt' in recordData && recordData.updatedAt 
+        ? (recordData.updatedAt as Date).toISOString()
+        : 'createdAt' in recordData && recordData.createdAt
+        ? (recordData.createdAt as Date).toISOString()
+        : new Date().toISOString();
 
       changes.push({
         entity: entityName,
-        id: record.id,
-        action: (record as any).deleted ? 'delete' : 'update',
-        data: record,
-        updatedAt: (record.updatedAt || record.createdAt || new Date()).toISOString(),
-        deleted: (record as any).deleted || false,
+        id: recordData.id,
+        action: (recordData as any).deleted ? 'delete' : 'update',
+        data: recordData,
+        updatedAt,
+        deleted: (recordData as any).deleted || false,
       });
     }
 

@@ -1,12 +1,12 @@
 import {
-  WebSocketGateway,
+  WebSocketGateway as NestWebSocketGateway,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-@WebSocketGateway({
+@NestWebSocketGateway({
   cors: {
     origin: '*',
   },
