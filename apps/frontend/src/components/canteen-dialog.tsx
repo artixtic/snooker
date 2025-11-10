@@ -239,6 +239,7 @@ export function CanteenDialog({ open, onClose, table, items: initialItems = [], 
             type="number"
             value={quantity}
             onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+            inputProps={{ min: 1, inputMode: 'numeric', pattern: '[0-9]*' }}
             sx={{ 
               width: 100,
               '& .MuiOutlinedInput-root': {

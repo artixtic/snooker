@@ -117,110 +117,239 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     : 0;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {mode === 'start' ? 'Start Shift' : 'Close Shift'}
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        }
+      }}
+    >
+      <DialogTitle 
+        sx={{ 
+          background: mode === 'start' 
+            ? 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)'
+            : 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '1.3rem',
+          py: 2,
+        }}
+      >
+        {mode === 'start' ? '🟢 Start Shift' : '🔒 Close Shift'}
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ pt: 3 }}>
         {mode === 'start' ? (
-          <Box sx={{ pt: 2 }}>
+          <Box>
             {activeShift && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                You already have an active shift. Please close it first.
+              <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                ⚠️ You already have an active shift. Please close it first.
               </Alert>
             )}
-            <TextField
-              fullWidth
-              label="Opening Cash"
-              type="number"
-              value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
-              margin="normal"
-              required
-              autoFocus
-              inputProps={{ step: 0.01, min: 0 }}
-              helperText="Enter the starting cash amount in the drawer"
-            />
+            <Box
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <Typography 
+                variant="h6" 
+                gutterBottom
+                sx={{ 
+                  color: '#FF9800',
+                  fontWeight: 'bold',
+                  mb: 2,
+                }}
+              >
+                💵 Opening Cash
+              </Typography>
+              <TextField
+                fullWidth
+                label="Opening Cash (PKR)"
+                type="number"
+                value={openingCash}
+                onChange={(e) => setOpeningCash(e.target.value)}
+                margin="normal"
+                required
+                autoFocus
+                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*' }}
+                helperText="Enter the starting cash amount in the drawer"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: '#FF9800',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#FF9800',
+                    },
+                  },
+                }}
+              />
+            </Box>
           </Box>
         ) : (
-          <Box sx={{ pt: 2 }}>
+          <Box>
             {shift && (
               <>
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Shift Summary
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography>Opening Cash:</Typography>
-                    <Typography fontWeight="bold">
-                      ${Number(shift.openingCash).toFixed(2)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography>Sales Total:</Typography>
-                    <Typography fontWeight="bold">
-                      ${Number(shift.salesTotal || 0).toFixed(2)}
-                    </Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Expected Cash:</Typography>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      ${(Number(shift.openingCash) + Number(shift.salesTotal || 0)).toFixed(2)}
-                    </Typography>
-                  </Box>
-                </Paper>
-
-                <TextField
-                  fullWidth
-                  label="Closing Cash"
-                  type="number"
-                  value={closingCash}
-                  onChange={(e) => setClosingCash(e.target.value)}
-                  margin="normal"
-                  required
-                  autoFocus
-                  inputProps={{ step: 0.01, min: 0 }}
-                />
-
-                {discrepancy !== 0 && (
-                  <Alert
-                    severity={discrepancy > 0 ? 'info' : 'warning'}
-                    sx={{ mt: 2 }}
+                <Box
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                    mb: 3,
+                  }}
+                >
+                  <Typography 
+                    variant="h6" 
+                    gutterBottom
+                    sx={{ 
+                      color: '#f44336',
+                      fontWeight: 'bold',
+                      mb: 2,
+                    }}
                   >
-                    {discrepancy > 0 ? 'Overage' : 'Shortage'}: $
-                    {Math.abs(discrepancy).toFixed(2)}
-                  </Alert>
-                )}
+                    📊 Shift Summary
+                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Typography variant="body1" fontWeight="medium">Opening Cash:</Typography>
+                    <Typography variant="body1" fontWeight="bold" color="#f44336">
+                      PKR {Math.ceil(Number(shift.openingCash))}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                    <Typography variant="body1" fontWeight="medium">Sales Total:</Typography>
+                    <Typography variant="body1" fontWeight="bold" color="#00BCD4">
+                      PKR {Math.ceil(Number(shift.salesTotal || 0))}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="h6" fontWeight="bold">Expected Cash:</Typography>
+                    <Typography variant="h6" fontWeight="bold" color="#4CAF50">
+                      PKR {Math.ceil(Number(shift.openingCash) + Number(shift.salesTotal || 0))}
+                    </Typography>
+                  </Box>
+                </Box>
 
-                <TextField
-                  fullWidth
-                  label="Notes (optional)"
-                  multiline
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  margin="normal"
-                  placeholder="Add notes about the shift or discrepancies..."
-                />
+                <Box
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                  }}
+                >
+                  <TextField
+                    fullWidth
+                    label="Closing Cash (PKR)"
+                    type="number"
+                    value={closingCash}
+                    onChange={(e) => setClosingCash(e.target.value)}
+                    margin="normal"
+                    required
+                    autoFocus
+                    inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*' }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: '#f44336',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#f44336',
+                        },
+                      },
+                    }}
+                  />
+
+                  {discrepancy !== 0 && (
+                    <Alert
+                      severity={discrepancy > 0 ? 'info' : 'warning'}
+                      sx={{ mt: 2, borderRadius: 2 }}
+                    >
+                      {discrepancy > 0 ? '💰 Overage' : '⚠️ Shortage'}: PKR {Math.ceil(Math.abs(discrepancy))}
+                    </Alert>
+                  )}
+
+                  <TextField
+                    fullWidth
+                    label="Notes (Optional)"
+                    multiline
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    margin="normal"
+                    placeholder="Add notes about the shift or discrepancies..."
+                    sx={{
+                      mt: 2,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      },
+                    }}
+                  />
+                </Box>
               </>
             )}
           </Box>
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+      <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
+        <Button 
+          onClick={onClose}
+          disabled={startMutation.isPending || closeMutation.isPending}
+          sx={{
+            borderRadius: 2,
+            px: 3,
+            fontWeight: 'bold',
+          }}
+        >
+          Cancel
+        </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
-          color="primary"
           disabled={
             mode === 'start'
               ? !openingCash || startMutation.isPending || !!activeShift
               : !closingCash || closeMutation.isPending
           }
+          sx={{
+            borderRadius: 2,
+            px: 4,
+            fontWeight: 'bold',
+            background: mode === 'start'
+              ? 'linear-gradient(135deg, #FF9800 30%, #F57C00 90%)'
+              : 'linear-gradient(135deg, #f44336 30%, #d32f2f 90%)',
+            color: 'white',
+            boxShadow: mode === 'start'
+              ? '0 4px 15px rgba(255, 152, 0, 0.4)'
+              : '0 4px 15px rgba(244, 67, 54, 0.4)',
+            '&:hover': {
+              background: mode === 'start'
+                ? 'linear-gradient(135deg, #F57C00 30%, #FF9800 90%)'
+                : 'linear-gradient(135deg, #d32f2f 30%, #f44336 90%)',
+              boxShadow: mode === 'start'
+                ? '0 6px 20px rgba(255, 152, 0, 0.6)'
+                : '0 6px 20px rgba(244, 67, 54, 0.6)',
+            },
+            '&:disabled': {
+              background: 'rgba(0, 0, 0, 0.2)',
+            },
+          }}
         >
-          {mode === 'start' ? 'Start Shift' : 'Close Shift'}
+          {mode === 'start' 
+            ? (startMutation.isPending ? 'Starting...' : '🚀 Start Shift')
+            : (closeMutation.isPending ? 'Closing...' : '🔒 Close Shift')
+          }
         </Button>
       </DialogActions>
     </Dialog>

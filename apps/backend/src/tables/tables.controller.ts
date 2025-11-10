@@ -37,8 +37,8 @@ export class TablesController {
   }
 
   @Post(':id/start')
-  start(@Param('id') id: string, @Body() dto: StartTableDto) {
-    return this.tablesService.start(id, dto);
+  start(@Param('id') id: string, @Body() dto: StartTableDto, @CurrentUser() user: any) {
+    return this.tablesService.start(id, dto, user.id);
   }
 
   @Post(':id/pause')

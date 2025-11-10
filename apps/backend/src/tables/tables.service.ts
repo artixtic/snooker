@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StartTableDto } from './dto/start-table.dto';
 import { StopTableDto } from './dto/stop-table.dto';
@@ -71,10 +71,22 @@ export class TablesService {
     });
   }
 
-  async start(tableId: string, dto: StartTableDto) {
+  async start(tableId: string, dto: StartTableDto, employeeId: string) {
     const table = await this.findOne(tableId);
     if (!table) {
-      throw new Error('Table not found');
+      throw new NotFoundException('Table not found');
+    }
+
+    // Check if there's an active shift for this employee
+    const activeShift = await this.prisma.shift.findFirst({
+      where: {
+        employeeId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!activeShift) {
+      throw new BadRequestException('No active shift found. Please start a shift before checking in a table.');
     }
 
     return this.prisma.tableSession.update({

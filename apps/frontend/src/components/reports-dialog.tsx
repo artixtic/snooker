@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogTitle,
@@ -16,6 +17,8 @@ import {
   Paper,
   Box,
   Typography,
+  TextField,
+  Alert,
 } from '@mui/material';
 import api from '@/lib/api';
 
@@ -25,14 +28,83 @@ interface ReportsDialogProps {
 }
 
 export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
-  const { data: report } = useQuery({
-    queryKey: ['daily-report'],
+  const [closingDialogOpen, setClosingDialogOpen] = useState(false);
+  const [closingCash, setClosingCash] = useState('');
+  const [notes, setNotes] = useState('');
+  const queryClient = useQueryClient();
+
+  // Get active shift
+  const { data: shifts, refetch: refetchShifts } = useQuery({
+    queryKey: ['shifts'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await api.get(`/reports/daily?date=${today}`);
+      const response = await api.get('/shifts');
       return response.data;
     },
     enabled: open,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+
+  // Refetch shifts when dialog opens
+  useEffect(() => {
+    if (open) {
+      refetchShifts();
+    }
+  }, [open, refetchShifts]);
+
+  const activeShift = shifts?.find((shift: any) => shift.status === 'ACTIVE');
+
+  // Get shift report for active shift - always refetch fresh data
+  const { data: report, refetch: refetchReport } = useQuery({
+    queryKey: ['shift-report', activeShift?.id],
+    queryFn: async () => {
+      if (!activeShift) {
+        return null;
+      }
+      const response = await api.get(`/shifts/${activeShift.id}/report`);
+      return response.data;
+    },
+    enabled: open && !!activeShift,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider data stale, force fresh fetch
+    cacheTime: 0, // Don't cache, always fetch fresh
+  });
+
+  // Refetch report when dialog opens or when closing dialog opens
+  useEffect(() => {
+    if (open && activeShift) {
+      refetchReport();
+    }
+  }, [open, activeShift, refetchReport]);
+
+  useEffect(() => {
+    if (closingDialogOpen && activeShift) {
+      // Refetch fresh data when closing dialog opens
+      refetchReport();
+    }
+  }, [closingDialogOpen, activeShift, refetchReport]);
+
+  const closeShiftMutation = useMutation({
+    mutationFn: async (data: { closingCash: number; notes?: string }) => {
+      if (!activeShift) {
+        throw new Error('No active shift found');
+      }
+      const response = await api.post(`/shifts/${activeShift.id}/close`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-report'] });
+      setClosingDialogOpen(false);
+      setClosingCash('');
+      setNotes('');
+      alert('Shift closed successfully!');
+      onClose();
+    },
+    onError: (error: any) => {
+      alert(error?.response?.data?.message || 'Failed to close shift. Please try again.');
+    },
   });
 
   // Get totals from report
@@ -42,57 +114,283 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   const expense = report?.totalExpenses || 0;
   const profit = total - expense;
 
+  const handleCloseDay = () => {
+    if (!activeShift) {
+      alert('No active shift found. Please start a shift first.');
+      return;
+    }
+    setClosingDialogOpen(true);
+  };
+
+  const handleConfirmClose = () => {
+    if (!closingCash || isNaN(Number(closingCash))) {
+      alert('Please enter a valid closing cash amount');
+      return;
+    }
+    closeShiftMutation.mutate({
+      closingCash: Number(closingCash),
+      notes: notes || undefined,
+    });
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Reports</DialogTitle>
-      <DialogContent>
-        <TableContainer component={Paper}>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        }
+      }}
+    >
+      <DialogTitle 
+        sx={{ 
+          background: 'linear-gradient(135deg, #00BCD4 0%, #0097A7 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '1.3rem',
+          py: 2,
+        }}
+      >
+        📊 Shift Closing Report
+      </DialogTitle>
+      <DialogContent sx={{ pt: 3 }}>
+        {!activeShift && (
+          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+            No active shift found. Please start a shift to view the closing report.
+          </Alert>
+        )}
+        {activeShift && report && (
+          <Box sx={{ mb: 3, p: 2, borderRadius: 2, background: 'rgba(255, 255, 255, 0.8)', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)' }}>
+            <Typography variant="body2" fontWeight="bold" sx={{ mb: 1, color: '#00BCD4' }}>
+              👤 Employee: {report.employee?.name || 'N/A'}
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              🕐 Started: {new Date(report.startedAt).toLocaleString()}
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              ⏱️ Duration: {(() => {
+                const startTime = new Date(report.startedAt).getTime();
+                const endTime = report.endedAt ? new Date(report.endedAt).getTime() : Date.now();
+                const duration = Math.max(0, Math.round((endTime - startTime) / 60000));
+                const hours = Math.floor(duration / 60);
+                const minutes = duration % 60;
+                return `${hours}h ${minutes}m`;
+              })()}
+            </Typography>
+            <Typography variant="body2">
+              💵 Opening Cash: PKR {Math.ceil(Number(report.openingCash || 0))}
+            </Typography>
+          </Box>
+        )}
+        <TableContainer 
+          component={Paper}
+          sx={{
+            borderRadius: 2,
+            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+          }}
+        >
           <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Amount (PKR)</TableCell>
+              </TableRow>
+            </TableHead>
             <TableBody>
               <TableRow>
-                <TableCell>
-                  <strong>Snooker/Billard</strong>
+                <TableCell sx={{ fontWeight: 'medium' }}>🎱 Snooker/Billard</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                  PKR {Math.ceil(snookerTotal)}
                 </TableCell>
-                <TableCell align="right">{snookerTotal.toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>
-                  <strong>Canteen</strong>
-                </TableCell>
-                <TableCell align="right">{canteenTotal.toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow sx={{ bgcolor: '#e3f2fd' }}>
-                <TableCell>
-                  <strong>Total</strong>
-                </TableCell>
-                <TableCell align="right">
-                  <strong>{total.toFixed(1)}</strong>
+                <TableCell sx={{ fontWeight: 'medium' }}>🛒 Canteen</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                  PKR {Math.ceil(canteenTotal)}
                 </TableCell>
               </TableRow>
-              <TableRow sx={{ bgcolor: '#ffebee' }}>
-                <TableCell>
-                  <strong>Expense</strong>
+              <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Total Sales</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#00BCD4' }}>
+                  PKR {Math.ceil(total)}
                 </TableCell>
-                <TableCell align="right">{expense.toFixed(1)}</TableCell>
               </TableRow>
-              <TableRow sx={{ bgcolor: '#e8f5e9' }}>
-                <TableCell>
-                  <strong>Profit</strong>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'medium' }}>💸 Expenses</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800' }}>
+                  PKR {Math.ceil(expense)}
                 </TableCell>
-                <TableCell align="right">
-                  <strong>{profit.toFixed(1)}</strong>
+              </TableRow>
+              <TableRow sx={{ bgcolor: 'rgba(76, 175, 80, 0.1)' }}>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>💰 Profit</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#4CAF50' }}>
+                  PKR {Math.ceil(profit)}
                 </TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </TableContainer>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} variant="outlined" color="error">
-          Close Today!
+      <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
+        <Button 
+          onClick={handleCloseDay} 
+          variant="contained" 
+          color="error"
+          disabled={!activeShift || closeShiftMutation.isPending}
+          sx={{
+            borderRadius: 2,
+            px: 4,
+            fontWeight: 'bold',
+            background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
+            boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
+            '&:hover': {
+              background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
+              boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
+            },
+            '&:disabled': {
+              background: 'rgba(0, 0, 0, 0.2)',
+            },
+          }}
+        >
+          {closeShiftMutation.isPending ? 'Closing...' : 'Close Shift!'}
         </Button>
-        <Button onClick={onClose}>Close</Button>
+        <Button 
+          onClick={onClose}
+          sx={{
+            borderRadius: 2,
+            px: 4,
+            fontWeight: 'bold',
+            background: 'linear-gradient(135deg, #00BCD4 30%, #0097A7 90%)',
+            color: 'white',
+            boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #0097A7 30%, #00BCD4 90%)',
+              boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
+            },
+          }}
+        >
+          Close
+        </Button>
       </DialogActions>
+
+      {/* Closing Dialog */}
+      <Dialog 
+        open={closingDialogOpen} 
+        onClose={() => !closeShiftMutation.isPending && setClosingDialogOpen(false)}
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '1.3rem',
+            py: 2,
+          }}
+        >
+          🔒 Close Shift
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          {activeShift && (
+            <Box>
+              <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+                <Typography variant="body2" fontWeight="bold">
+                  Opening Cash: PKR {Math.ceil(Number(activeShift.openingCash || 0))}
+                </Typography>
+                <Typography variant="body2">
+                  Expected Cash: PKR {Math.ceil(Number(activeShift.openingCash || 0) + (report?.totalSales || 0))}
+                </Typography>
+              </Alert>
+              
+              <TextField
+                fullWidth
+                label="Closing Cash (PKR)"
+                type="number"
+                value={closingCash}
+                onChange={(e) => setClosingCash(e.target.value)}
+                margin="normal"
+                required
+                autoFocus
+                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*' }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: '#f44336',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#f44336',
+                    },
+                  },
+                }}
+              />
+              
+              <TextField
+                fullWidth
+                label="Notes (Optional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                margin="normal"
+                multiline
+                rows={3}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
+          <Button 
+            onClick={() => setClosingDialogOpen(false)}
+            disabled={closeShiftMutation.isPending}
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              fontWeight: 'bold',
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmClose}
+            disabled={closeShiftMutation.isPending || !closingCash}
+            variant="contained"
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #f44336 30%, #d32f2f 90%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #d32f2f 30%, #f44336 90%)',
+                boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
+              },
+              '&:disabled': {
+                background: 'rgba(0, 0, 0, 0.2)',
+              },
+            }}
+          >
+            {closeShiftMutation.isPending ? 'Closing...' : 'Confirm Close'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

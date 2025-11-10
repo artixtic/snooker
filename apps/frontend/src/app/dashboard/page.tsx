@@ -26,6 +26,7 @@ import {
   FormControlLabel,
   Checkbox,
   Collapse,
+  Alert,
 } from '@mui/material';
 import {
   Add,
@@ -34,15 +35,8 @@ import {
   History,
   AttachMoney,
   Receipt,
-  Settings,
   Logout,
-  Print,
-  PhoneAndroid,
   Assessment,
-  Lightbulb,
-  QrCode,
-  Email,
-  WhatsApp,
   Pause,
   PlayArrow,
   ExpandMore,
@@ -54,6 +48,8 @@ import { InventoryDialog } from '@/components/inventory-dialog';
 import { CanteenDialog } from '@/components/canteen-dialog';
 import { ExpenseDialog } from '@/components/expense-dialog';
 import { ReportsDialog } from '@/components/reports-dialog';
+import { CustomReportsDialog } from '@/components/custom-reports-dialog';
+import { ShiftModal } from '@/components/shift-modal';
 
 interface Table {
   id: string;
@@ -82,7 +78,9 @@ export default function DashboardPage() {
   const [canteenDialogOpen, setCanteenDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [reportsDialogOpen, setReportsDialogOpen] = useState(false);
+  const [customReportsDialogOpen, setCustomReportsDialogOpen] = useState(false);
   const [startTableDialogOpen, setStartTableDialogOpen] = useState(false);
+  const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [createTableDialogOpen, setCreateTableDialogOpen] = useState(false);
   const [deleteAllTablesDialogOpen, setDeleteAllTablesDialogOpen] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState(1);
@@ -102,6 +100,17 @@ export default function DashboardPage() {
     },
     refetchInterval: 5000, // Refetch every 5 seconds for data sync
   });
+
+  // Check for active shift
+  const { data: shifts } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: async () => {
+      const response = await api.get('/shifts');
+      return response.data;
+    },
+  });
+
+  const activeShift = shifts?.find((shift: any) => shift.status === 'ACTIVE');
 
   // Auto-expand cards when they become occupied
   useEffect(() => {
@@ -131,6 +140,10 @@ export default function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       setStartTableDialogOpen(false);
       setRatePerMinute(8); // Reset to default
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.message || 'Failed to start table. Please try again.';
+      alert(`⚠️ ${errorMessage}`);
     },
   });
 
@@ -375,6 +388,28 @@ export default function DashboardPage() {
           <Typography variant="body2" sx={{ mr: 3 }}>
             +92 316 1126671
           </Typography>
+          {!activeShift && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<CheckCircle />}
+              onClick={() => setShiftModalOpen(true)}
+              sx={{ 
+                mr: 1,
+                py: 0.5,
+                px: 1.5,
+                fontSize: '0.85rem',
+                background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
+                boxShadow: '0 4px 15px rgba(255, 152, 0, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #F57C00 30%, #FF9800 90%)',
+                  boxShadow: '0 6px 20px rgba(255, 152, 0, 0.6)',
+                }
+              }}
+            >
+              Start Shift
+            </Button>
+          )}
           <Button
             variant="contained"
             size="small"
@@ -427,22 +462,22 @@ export default function DashboardPage() {
           <Button
             variant="contained"
             size="small"
-            endIcon={<Settings />}
+            startIcon={<Assessment />}
             onClick={(e) => setAddonsAnchor(e.currentTarget)}
             sx={{ 
               mr: 1,
               py: 0.5,
               px: 1.5,
               fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
-              boxShadow: '0 4px 15px rgba(255, 152, 0, 0.4)',
+              background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)',
+              boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
               '&:hover': {
-                background: 'linear-gradient(45deg, #F57C00 30%, #FF9800 90%)',
-                boxShadow: '0 6px 20px rgba(255, 152, 0, 0.6)',
+                background: 'linear-gradient(45deg, #0097A7 30%, #00BCD4 90%)',
+                boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
               }
             }}
           >
-            Add-ons
+            Reports
           </Button>
           <Button 
             variant="contained"
@@ -527,39 +562,39 @@ export default function DashboardPage() {
         </Toolbar>
       </AppBar>
 
-      {/* Add-ons Menu */}
+      {/* Reports Menu */}
       <Menu
         anchorEl={addonsAnchor}
         open={Boolean(addonsAnchor)}
         onClose={() => setAddonsAnchor(null)}
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            mt: 1,
+          }
+        }}
       >
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><Print fontSize="small" /></ListItemIcon>
-          <ListItemText>Receipt Printer</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><PhoneAndroid fontSize="small" /></ListItemIcon>
-          <ListItemText>Mobile App</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><Assessment fontSize="small" /></ListItemIcon>
-          <ListItemText>Reporting</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><Lightbulb fontSize="small" /></ListItemIcon>
-          <ListItemText>Control AC/Light</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><QrCode fontSize="small" /></ListItemIcon>
-          <ListItemText>QR Code Check-in</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><Email fontSize="small" /></ListItemIcon>
-          <ListItemText>SMS Notification</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={() => {}}>
-          <ListItemIcon><WhatsApp fontSize="small" /></ListItemIcon>
-          <ListItemText>WhatsApp Notification</ListItemText>
+        <MenuItem 
+          onClick={() => {
+            setAddonsAnchor(null);
+            setCustomReportsDialogOpen(true);
+          }}
+          sx={{
+            '&:hover': {
+              bgcolor: 'rgba(0, 188, 212, 0.1)',
+            },
+          }}
+        >
+          <ListItemIcon>
+            <Assessment fontSize="small" sx={{ color: '#00BCD4' }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Custom Reports"
+            primaryTypographyProps={{
+              fontWeight: 'medium',
+            }}
+          />
         </MenuItem>
       </Menu>
 
@@ -911,23 +946,35 @@ export default function DashboardPage() {
                           startIcon={<CheckCircle />}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!activeShift) {
+                              alert('⚠️ Please start a shift first before checking in a table!');
+                              return;
+                            }
                             setSelectedTable(table);
                             setRatePerMinute(8); // Reset to default
                             setStartTableDialogOpen(true);
                           }}
+                          disabled={!activeShift}
                           sx={{ 
                             mt: 4,
-                            background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
-                            color: 'white',
+                            background: activeShift 
+                              ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
+                              : 'rgba(0, 0, 0, 0.2)',
+                            color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
                             fontWeight: 'bold',
-                            boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-                            '&:hover': {
+                            boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
+                            '&:hover': activeShift ? {
                               background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
                               boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                            } : {},
+                            '&:disabled': {
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              color: 'rgba(255, 255, 255, 0.5)',
                             }
                           }}
+                          title={!activeShift ? 'Please start a shift first' : ''}
                         >
-                          Check In
+                          {activeShift ? 'Check In' : '⚠️ Start Shift First'}
                         </Button>
                       )}
                     </Collapse>
@@ -940,23 +987,35 @@ export default function DashboardPage() {
                         startIcon={<CheckCircle />}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (!activeShift) {
+                            alert('⚠️ Please start a shift first before checking in a table!');
+                            return;
+                          }
                           setSelectedTable(table);
                           setRatePerMinute(8);
                           setStartTableDialogOpen(true);
                         }}
+                        disabled={!activeShift}
                         sx={{ 
                           mt: 2,
-                          background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
-                          color: 'white',
+                          background: activeShift 
+                            ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
+                            : 'rgba(0, 0, 0, 0.2)',
+                          color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
                           fontWeight: 'bold',
-                          boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-                          '&:hover': {
+                          boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
+                          '&:hover': activeShift ? {
                             background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
                             boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                          } : {},
+                          '&:disabled': {
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            color: 'rgba(255, 255, 255, 0.5)',
                           }
                         }}
+                        title={!activeShift ? 'Please start a shift first' : ''}
                       >
-                        Check In
+                        {activeShift ? 'Check In' : '⚠️ Start Shift First'}
                       </Button>
                     )}
                   </CardContent>
@@ -1061,10 +1120,23 @@ export default function DashboardPage() {
         onClose={() => setExpenseDialogOpen(false)}
       />
 
-      {/* Reports Dialog */}
+      {/* Reports Dialog (Daily Closing) */}
       <ReportsDialog
         open={reportsDialogOpen}
         onClose={() => setReportsDialogOpen(false)}
+      />
+
+      {/* Custom Reports Dialog */}
+      <CustomReportsDialog
+        open={customReportsDialogOpen}
+        onClose={() => setCustomReportsDialogOpen(false)}
+      />
+
+      {/* Shift Modal */}
+      <ShiftModal
+        open={shiftModalOpen}
+        onClose={() => setShiftModalOpen(false)}
+        mode="start"
       />
 
       {/* Create Table Dialog */}
@@ -1101,7 +1173,7 @@ export default function DashboardPage() {
             onChange={(e) => setNewTableNumber(parseInt(e.target.value) || 1)}
             margin="normal"
             autoFocus
-            inputProps={{ min: 1 }}
+            inputProps={{ min: 1, inputMode: 'numeric', pattern: '[0-9]*' }}
             helperText="Enter the table number"
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -1265,6 +1337,11 @@ export default function DashboardPage() {
           ✅ Check In - Snooker {selectedTable?.tableNumber || 'N/A'}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
+          {!activeShift && (
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+              ⚠️ <strong>No Active Shift!</strong> Please start a shift first before checking in a table.
+            </Alert>
+          )}
           <TextField
             fullWidth
             label="Rate Per Minute (PKR)"
@@ -1273,7 +1350,7 @@ export default function DashboardPage() {
             onChange={(e) => setRatePerMinute(parseFloat(e.target.value) || 8)}
             margin="normal"
             autoFocus
-            inputProps={{ min: 0, step: 0.01 }}
+            inputProps={{ min: 0, step: 0.01, inputMode: 'decimal', pattern: '[0-9.]*' }}
             helperText={`Default: PKR ${Math.ceil(ratePerMinute)}/min (PKR ${Math.ceil(ratePerMinute * 60)}/hour)`}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -1307,6 +1384,11 @@ export default function DashboardPage() {
           <Button
             variant="contained"
             onClick={() => {
+              if (!activeShift) {
+                alert('⚠️ Please start a shift first before checking in a table!');
+                setStartTableDialogOpen(false);
+                return;
+              }
               if (selectedTable) {
                 startTableMutation.mutate({
                   tableId: selectedTable.id,
@@ -1314,23 +1396,31 @@ export default function DashboardPage() {
                 });
               }
             }}
-            disabled={startTableMutation.isPending || ratePerMinute <= 0}
+            disabled={startTableMutation.isPending || ratePerMinute <= 0 || !activeShift}
             sx={{
               borderRadius: 2,
               px: 4,
               fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #4CAF50 30%, #45a049 90%)',
-              boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-              '&:hover': {
+              background: activeShift
+                ? 'linear-gradient(135deg, #4CAF50 30%, #45a049 90%)'
+                : 'rgba(0, 0, 0, 0.2)',
+              boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
+              '&:hover': activeShift ? {
                 background: 'linear-gradient(135deg, #45a049 30%, #4CAF50 90%)',
                 boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-              },
+              } : {},
               '&:disabled': {
                 background: 'rgba(0, 0, 0, 0.2)',
+                color: 'rgba(0, 0, 0, 0.5)',
               },
             }}
           >
-            🚀 Start Table
+            {startTableMutation.isPending 
+              ? 'Starting...' 
+              : !activeShift 
+                ? '⚠️ Start Shift First' 
+                : '🚀 Start Table'
+            }
           </Button>
         </DialogActions>
       </Dialog>
@@ -1579,6 +1669,7 @@ function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [] }: { 
           onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
           margin="normal"
           autoFocus
+          inputProps={{ min: 0, step: 0.01, inputMode: 'decimal', pattern: '[0-9.]*' }}
           sx={{
             mt: 2,
             '& .MuiOutlinedInput-root': {

@@ -15,6 +15,11 @@ export class ShiftsController {
     return this.shiftsService.findAll();
   }
 
+  @Get(':id/report')
+  getShiftReport(@Param('id') id: string) {
+    return this.shiftsService.getShiftReport(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.shiftsService.findOne(id);

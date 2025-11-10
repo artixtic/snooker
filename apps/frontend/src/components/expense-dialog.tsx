@@ -66,14 +66,51 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Add Expense</DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2}>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        }
+      }}
+    >
+      <DialogTitle 
+        sx={{ 
+          background: 'linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '1.3rem',
+          py: 2,
+        }}
+      >
+        💰 Expense Management
+      </DialogTitle>
+      <DialogContent sx={{ pt: 3 }}>
+        <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Add Expense
+            <Box
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <Typography 
+                variant="h6" 
+                gutterBottom
+                sx={{ 
+                  color: '#9C27B0',
+                  fontWeight: 'bold',
+                  mb: 2,
+                }}
+              >
+                ➕ Add Expense
               </Typography>
               <TextField
                 fullWidth
@@ -82,53 +119,138 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                 onChange={(e) => setExpenseName(e.target.value)}
                 margin="normal"
                 placeholder="Expense name"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: '#9C27B0',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#9C27B0',
+                    },
+                  },
+                }}
               />
               <TextField
                 fullWidth
-                label="Amount"
+                label="Amount (PKR)"
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 margin="normal"
                 placeholder="Amount"
+                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*' }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: '#9C27B0',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#9C27B0',
+                    },
+                  },
+                }}
               />
               <Button
                 variant="contained"
-                color="success"
                 startIcon={<Add />}
                 onClick={handleSubmit}
-                sx={{ mt: 2 }}
+                disabled={createMutation.isPending}
+                sx={{ 
+                  mt: 2,
+                  borderRadius: 2,
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                  color: 'white',
+                  boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                    boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                  },
+                }}
               >
                 Add Expense
               </Button>
             </Box>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Expense List
+            <Box
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <Typography 
+                variant="h6" 
+                gutterBottom
+                sx={{ 
+                  color: '#9C27B0',
+                  fontWeight: 'bold',
+                  mb: 2,
+                }}
+              >
+                📋 Expense List
               </Typography>
               {expenses.length === 0 ? (
-                <Alert severity="warning">
-                  You have not added any thing yet!
-                </Alert>
+                <Box
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    background: 'rgba(255, 193, 7, 0.1)',
+                    border: '1px solid rgba(255, 193, 7, 0.3)',
+                  }}
+                >
+                  <Alert 
+                    severity="warning"
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiAlert-icon': {
+                        fontSize: '1.5rem',
+                      },
+                    }}
+                  >
+                    ⚠️ You have not added any expenses yet!
+                  </Alert>
+                </Box>
               ) : (
-                <TableContainer component={Paper}>
+                <TableContainer 
+                  component={Paper}
+                  sx={{
+                    borderRadius: 2,
+                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                    overflow: 'auto',
+                  }}
+                >
                   <Table size="small">
                     <TableHead>
-                      <TableRow>
-                        <TableCell>#</TableCell>
-                        <TableCell>Expense</TableCell>
-                        <TableCell>Amount</TableCell>
-                        <TableCell>Date</TableCell>
+                      <TableRow sx={{ bgcolor: 'rgba(156, 39, 176, 0.1)' }}>
+                        <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Expense</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {expenses.map((expense: any, index: number) => (
-                        <TableRow key={expense.id}>
+                        <TableRow 
+                          key={expense.id}
+                          sx={{
+                            '&:hover': {
+                              bgcolor: 'rgba(156, 39, 176, 0.05)',
+                            },
+                            '&:nth-of-type(even)': {
+                              bgcolor: 'rgba(0, 0, 0, 0.02)',
+                            },
+                          }}
+                        >
                           <TableCell>{index + 1}</TableCell>
-                          <TableCell>{expense.description}</TableCell>
-                          <TableCell>PKR {Number(expense.amount).toFixed(2)}</TableCell>
+                          <TableCell sx={{ fontWeight: 'medium' }}>{expense.description}</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#9C27B0' }}>
+                            PKR {Math.ceil(Number(expense.amount))}
+                          </TableCell>
                           <TableCell>
                             {new Date(expense.date).toLocaleDateString()}
                           </TableCell>
@@ -142,8 +264,24 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>x Close</Button>
+      <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
+        <Button 
+          onClick={onClose}
+          sx={{
+            borderRadius: 2,
+            px: 4,
+            fontWeight: 'bold',
+            background: 'linear-gradient(135deg, #9C27B0 30%, #7B1FA2 90%)',
+            color: 'white',
+            boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #7B1FA2 30%, #9C27B0 90%)',
+              boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
+            },
+          }}
+        >
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );
