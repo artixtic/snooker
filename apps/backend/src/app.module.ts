@@ -14,6 +14,15 @@ import { SyncModule } from './sync/sync.module';
 import { ReportsModule } from './reports/reports.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { WebSocketModule } from './websocket/websocket.module';
+import { MembersModule } from './members/members.module';
+import { CreditsModule } from './credits/credits.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { TableMaintenanceModule } from './table-maintenance/table-maintenance.module';
+import { TableRateRulesModule } from './table-rate-rules/table-rate-rules.module';
+import { KitchenOrdersModule } from './kitchen-orders/kitchen-orders.module';
+import { MatchesModule } from './matches/matches.module';
+import { TournamentsModule } from './tournaments/tournaments.module';
 
 @Module({
   imports: [
@@ -32,6 +41,15 @@ import { WebSocketModule } from './websocket/websocket.module';
     ReportsModule,
     ActivityLogsModule,
     WebSocketModule,
+    MembersModule,
+    CreditsModule,
+    ExpensesModule,
+    BookingsModule,
+    TableMaintenanceModule,
+    TableRateRulesModule,
+    KitchenOrdersModule,
+    MatchesModule,
+    TournamentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

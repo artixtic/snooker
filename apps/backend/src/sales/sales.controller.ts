@@ -27,11 +27,13 @@ export class SalesController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('employeeId') employeeId?: string,
+    @Query('tableId') tableId?: string,
   ) {
     return this.salesService.findAll({
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       employeeId,
+      tableId,
     });
   }
 

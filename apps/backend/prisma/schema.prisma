@@ -16,6 +16,7 @@ enum UserRole {
 enum TableStatus {
   AVAILABLE
   OCCUPIED
+  PAUSED
   RESERVED
 }
 
@@ -23,11 +24,75 @@ enum PaymentMethod {
   CASH
   CARD
   MIXED
+  CREDIT
 }
 
 enum ShiftStatus {
   ACTIVE
   CLOSED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  SUPPLIES
+  MAINTENANCE
+  SALARIES
+  MARKETING
+  OTHER
+}
+
+enum RateRuleType {
+  TIME_BASED
+  DAY_BASED
+  MEMBER_DISCOUNT
+  PEAK_HOURS
+}
+
+enum KitchenOrderStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  FINISHED
+  CANCELLED
+}
+
+enum TournamentStatus {
+  DRAFT
+  REGISTRATION
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TournamentFormat {
+  SINGLE_ELIMINATION
+  DOUBLE_ELIMINATION
+  ROUND_ROBIN
+  SWISS
 }
 
 model User {
@@ -41,10 +106,21 @@ model User {
   deleted   Boolean  @default(false)
 
   // Relations
-  sales          Sale[]
-  shifts         Shift[]
-  inventoryMoves InventoryMovement[]
-  activityLogs   ActivityLog[]
+  sales              Sale[]
+  shifts             Shift[]
+  inventoryMoves     InventoryMovement[]
+  activityLogs       ActivityLog[]
+  creditTransactions CreditTransaction[]
+  expenses           Expense[]
+  tableMaintenance   TableMaintenance[]
+  matchPlayers       MatchPlayer[] @relation("UserMatchPlayers")
+  tournamentPlayers  TournamentPlayer[] @relation("UserTournamentPlayers")
+  tournamentsCreated Tournament[]
+
+  // Player stats
+  wins               Int      @default(0)
+  losses             Int      @default(0)
+  totalMatches       Int      @default(0)
 
   @@map("users")
 }
@@ -80,6 +156,7 @@ model Sale {
   id            String        @id @default(cuid())
   receiptNumber String?       @unique
   tableId       String?
+  memberId      String?
   employeeId    String
   subtotal      Decimal       @db.Decimal(10, 2)
   discount      Decimal?      @db.Decimal(10, 2)
@@ -97,10 +174,14 @@ model Sale {
   // Relations
   employee User       @relation(fields: [employeeId], references: [id])
   table    TableSession? @relation(fields: [tableId], references: [id])
+  member   Member?    @relation(fields: [memberId], references: [id])
   items    SaleItem[]
+  creditTransactions CreditTransaction[]
+  match    Match?
 
   @@map("sales")
   @@index([employeeId])
+  @@index([memberId])
   @@index([createdAt])
   @@index([clientId])
 }
@@ -126,21 +207,30 @@ model SaleItem {
 }
 
 model TableSession {
-  id           String      @id @default(cuid())
-  tableNumber  Int         @unique
-  status       TableStatus @default(AVAILABLE)
-  startedAt    DateTime?
-  endedAt      DateTime?
-  ratePerHour  Decimal     @db.Decimal(10, 2) @default(0)
-  discount     Decimal?    @db.Decimal(10, 2)
-  currentCharge Decimal    @db.Decimal(10, 2) @default(0)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  tableNumber    Int         @unique
+  status         TableStatus @default(AVAILABLE)
+  memberId       String?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  pausedAt       DateTime?
+  totalPausedMs  Int         @default(0) // Total paused time in milliseconds
+  lastResumedAt  DateTime?   // When the table was last resumed
+  ratePerHour    Decimal     @db.Decimal(10, 2) @default(0)
+  discount       Decimal?    @db.Decimal(10, 2)
+  currentCharge  Decimal     @db.Decimal(10, 2) @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   // Relations
-  sales Sale[]
+  member Member? @relation(fields: [memberId], references: [id])
+  sales  Sale[]
+  bookings Booking[]
+  maintenanceRecords TableMaintenance[]
+  matches Match[]
 
   @@map("tables")
+  @@index([memberId])
 }
 
 model Shift {
@@ -221,5 +311,305 @@ model ActivityLog {
   @@index([userId])
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// Members Management
+model Member {
+  id            String   @id @default(cuid())
+  memberNumber  String   @unique
+  name          String
+  phone         String?
+  email         String?
+  address       String?  @db.Text
+  dateOfBirth   DateTime?
+  joinDate      DateTime @default(now())
+  memberType    String   @default("REGULAR") // REGULAR, VIP, PREMIUM
+  discountPercent Decimal? @db.Decimal(5, 2) @default(0) // Member discount percentage
+  creditLimit   Decimal  @db.Decimal(10, 2) @default(0)
+  balance       Decimal  @db.Decimal(10, 2) @default(0) // Current credit balance
+  isActive      Boolean  @default(true)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  sales              Sale[]
+  creditTransactions CreditTransaction[]
+  tableSessions      TableSession[]
+  bookings           Booking[]
+  matchPlayers       MatchPlayer[] @relation("MemberMatchPlayers")
+  tournamentPlayers  TournamentPlayer[] @relation("MemberTournamentPlayers")
+
+  // Player stats
+  wins               Int      @default(0)
+  losses             Int      @default(0)
+  totalMatches       Int      @default(0)
+
+  @@map("members")
+  @@index([memberNumber])
+  @@index([phone])
+  @@index([email])
+  @@index([isActive])
+}
+
+// Credit Management
+model CreditTransaction {
+  id            String   @id @default(cuid())
+  memberId      String
+  saleId        String?
+  type          String   // 'SALE', 'PAYMENT', 'ADJUSTMENT', 'REFUND'
+  amount        Decimal  @db.Decimal(10, 2)
+  balanceBefore Decimal  @db.Decimal(10, 2)
+  balanceAfter  Decimal  @db.Decimal(10, 2)
+  description   String?  @db.Text
+  employeeId    String
+  createdAt     DateTime @default(now())
+
+  // Relations
+  member   Member @relation(fields: [memberId], references: [id])
+  sale     Sale?  @relation(fields: [saleId], references: [id])
+  employee User   @relation(fields: [employeeId], references: [id])
+
+  @@map("credit_transactions")
+  @@index([memberId])
+  @@index([saleId])
+  @@index([createdAt])
+}
+
+// Expense Management
+model Expense {
+  id          String          @id @default(cuid())
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  description String          @db.Text
+  date        DateTime        @default(now())
+  employeeId  String
+  receiptUrl  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  employee User @relation(fields: [employeeId], references: [id])
+
+  @@map("expenses")
+  @@index([category])
+  @@index([date])
+  @@index([employeeId])
+}
+
+// Booking System
+model Booking {
+  id          String        @id @default(cuid())
+  tableId     String
+  memberId    String?
+  customerName String?      // For non-member bookings
+  customerPhone String?
+  startTime   DateTime
+  endTime     DateTime
+  status      BookingStatus @default(PENDING)
+  notes       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  table  TableSession @relation(fields: [tableId], references: [id])
+  member Member?      @relation(fields: [memberId], references: [id])
+
+  @@map("bookings")
+  @@index([tableId])
+  @@index([memberId])
+  @@index([startTime])
+  @@index([status])
+}
+
+// Table Maintenance
+model TableMaintenance {
+  id          String            @id @default(cuid())
+  tableId     String
+  type        String            // 'CLOTH_CHANGE', 'CUSHION_REPLACE', 'CLEANING', 'REPAIR', 'OTHER'
+  scheduledDate DateTime
+  completedDate DateTime?
+  status      MaintenanceStatus @default(SCHEDULED)
+  cost        Decimal?          @db.Decimal(10, 2)
+  description String?           @db.Text
+  employeeId  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  table    TableSession @relation(fields: [tableId], references: [id])
+  employee User?        @relation(fields: [employeeId], references: [id])
+
+  @@map("table_maintenance")
+  @@index([tableId])
+  @@index([scheduledDate])
+  @@index([status])
+}
+
+// Advanced Table Rate Rules
+model TableRateRule {
+  id          String        @id @default(cuid())
+  tableId     String?       // null = applies to all tables
+  ruleType    RateRuleType
+  name        String
+  description String?       @db.Text
+  // Time-based rules
+  startTime   String?       // HH:mm format
+  endTime     String?       // HH:mm format
+  // Day-based rules
+  daysOfWeek  String?       // Comma-separated: 0,1,2,3,4,5,6 (Sunday=0)
+  // Member discount
+  memberType  String?       // Member type for discount
+  discountPercent Decimal?  @db.Decimal(5, 2)
+  // Rate override
+  ratePerHour Decimal       @db.Decimal(10, 2)
+  isActive    Boolean       @default(true)
+  priority    Int           @default(0) // Higher priority = applied first
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("table_rate_rules")
+  @@index([tableId])
+  @@index([ruleType])
+  @@index([isActive])
+  @@index([priority])
+}
+
+// Kitchen Dashboard
+model KitchenOrder {
+  id          String            @id @default(cuid())
+  saleId      String
+  status      KitchenOrderStatus @default(PENDING)
+  items       Json              // Array of order items with product details
+  notes       String?           @db.Text
+  estimatedTime Int?            // Estimated preparation time in minutes
+  startedAt   DateTime?
+  readyAt     DateTime?
+  servedAt    DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("kitchen_orders")
+  @@index([saleId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Match Management
+model Match {
+  id          String      @id @default(cuid())
+  tableId     String
+  status      MatchStatus @default(SCHEDULED)
+  gameType    String      @default("snooker") // snooker, pool, 8ball, 9ball, etc.
+  startTime   DateTime?
+  endTime     DateTime?
+  score       Json?       // JSON object with player scores: { "playerId": score }
+  metadata    Json?       // Additional match data (frames, breaks, etc.)
+  saleId      String?     @unique // Link to sale if match is paid (one-to-one)
+  isPaid      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  table   TableSession @relation(fields: [tableId], references: [id])
+  players MatchPlayer[]
+  sale    Sale?        @relation(fields: [saleId], references: [id])
+  tournamentMatches TournamentMatch[]
+
+  @@map("matches")
+  @@index([tableId])
+  @@index([status])
+  @@index([startTime])
+  @@index([isPaid])
+}
+
+model MatchPlayer {
+  id          String   @id @default(cuid())
+  matchId     String
+  playerId    String?  // Can be User ID
+  memberId    String?  // Or Member ID
+  seatNumber  Int      // Player position (1, 2, etc.)
+  result      String?  // 'win', 'loss', 'draw', null if not finished
+  score       Int      @default(0) // Final score for this player
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  match   Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player  User?   @relation("UserMatchPlayers", fields: [playerId], references: [id])
+  member  Member? @relation("MemberMatchPlayers", fields: [memberId], references: [id])
+
+  @@map("match_players")
+  @@index([matchId])
+  @@index([playerId])
+  @@index([memberId])
+  @@unique([matchId, seatNumber])
+}
+
+// Tournament Management
+model Tournament {
+  id          String           @id @default(cuid())
+  name        String
+  format      TournamentFormat @default(SINGLE_ELIMINATION)
+  bracket     Json?            // Tournament bracket structure
+  status      TournamentStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  maxPlayers  Int?
+  entryFee    Decimal?         @db.Decimal(10, 2)
+  prizePool   Decimal?         @db.Decimal(10, 2)
+  description String?          @db.Text
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  creator         User              @relation(fields: [createdById], references: [id])
+  participants    TournamentPlayer[]
+  matches         TournamentMatch[]
+
+  @@map("tournaments")
+  @@index([status])
+  @@index([startDate])
+  @@index([createdById])
+}
+
+model TournamentPlayer {
+  id           String   @id @default(cuid())
+  tournamentId String
+  playerId     String?  // User ID
+  memberId     String?  // Member ID
+  seed         Int?     // Tournament seed number
+  status       String   @default("registered") // registered, active, eliminated, winner
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     User?      @relation("UserTournamentPlayers", fields: [playerId], references: [id])
+  member     Member?    @relation("MemberTournamentPlayers", fields: [memberId], references: [id])
+
+  @@map("tournament_players")
+  @@index([tournamentId])
+  @@index([playerId])
+  @@index([memberId])
+  @@unique([tournamentId, playerId])
+  @@unique([tournamentId, memberId])
+}
+
+model TournamentMatch {
+  id           String   @id @default(cuid())
+  tournamentId String
+  matchId      String   @unique // One match can only be in one tournament match
+  round        Int      // Round number in tournament
+  bracketPosition String? // Position in bracket (e.g., "A1", "B2")
+  createdAt    DateTime @default(now())
+
+  // Relations
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match      Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@map("tournament_matches")
+  @@index([tournamentId])
 }
 

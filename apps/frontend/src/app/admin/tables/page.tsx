@@ -42,6 +42,9 @@ export default function AdminTablesPage() {
               tableNumber={table.tableNumber}
               ratePerHour={Number(table.ratePerHour)}
               startedAt={table.startedAt}
+              pausedAt={table.pausedAt}
+              totalPausedMs={table.totalPausedMs || 0}
+              lastResumedAt={table.lastResumedAt}
               status={table.status}
             />
           </Grid>

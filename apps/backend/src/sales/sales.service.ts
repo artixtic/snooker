@@ -10,43 +10,100 @@ export class SalesService {
     // Generate receipt number
     const receiptNumber = await this.generateReceiptNumber();
 
-    // Create sale with items (append-only, no updates)
-    return this.prisma.sale.create({
-      data: {
-        ...createSaleDto,
-        receiptNumber,
-        employeeId,
-        items: {
-          create: createSaleDto.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-            tax: item.tax,
-            subtotal: item.subtotal,
-            notes: item.notes,
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
+    // If credit payment, validate member and credit limit
+    if (createSaleDto.paymentMethod === 'CREDIT') {
+      if (!createSaleDto.memberId) {
+        throw new NotFoundException('Member ID is required for credit payments');
+      }
+
+      const member = await this.prisma.member.findUnique({
+        where: { id: createSaleDto.memberId },
+      });
+
+      if (!member) {
+        throw new NotFoundException(`Member with ID ${createSaleDto.memberId} not found`);
+      }
+
+      const newBalance = Number(member.balance) + createSaleDto.total;
+      if (newBalance > Number(member.creditLimit)) {
+        throw new Error(
+          `Credit limit exceeded. Available credit: ${Number(member.creditLimit) - Number(member.balance)}`,
+        );
+      }
+    }
+
+    // Create sale with items and credit transaction if needed
+    return this.prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.create({
+        data: {
+          ...createSaleDto,
+          receiptNumber,
+          employeeId,
+          items: {
+            create: (createSaleDto.items || []).map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
+              tax: item.tax,
+              subtotal: item.subtotal,
+              notes: item.notes,
+            })),
           },
         },
-        employee: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
           },
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+            },
+          },
+          table: true,
+          member: true,
         },
-        table: true,
-      },
+      });
+
+      // Create credit transaction if payment is credit
+      if (createSaleDto.paymentMethod === 'CREDIT' && createSaleDto.memberId) {
+        const member = await tx.member.findUnique({
+          where: { id: createSaleDto.memberId },
+        });
+
+        if (member) {
+          const balanceBefore = Number(member.balance);
+          const balanceAfter = balanceBefore + createSaleDto.total;
+
+          await tx.creditTransaction.create({
+            data: {
+              memberId: createSaleDto.memberId,
+              saleId: sale.id,
+              type: 'SALE',
+              amount: createSaleDto.total,
+              balanceBefore,
+              balanceAfter,
+              description: `Sale ${receiptNumber}`,
+              employeeId,
+            },
+          });
+
+          await tx.member.update({
+            where: { id: createSaleDto.memberId },
+            data: { balance: balanceAfter },
+          });
+        }
+      }
+
+      return sale;
     });
   }
 
-  async findAll(filters?: { startDate?: Date; endDate?: Date; employeeId?: string }) {
+  async findAll(filters?: { startDate?: Date; endDate?: Date; employeeId?: string; tableId?: string }) {
     const where: any = {};
     if (filters?.startDate || filters?.endDate) {
       where.createdAt = {};
@@ -55,6 +112,9 @@ export class SalesService {
     }
     if (filters?.employeeId) {
       where.employeeId = filters.employeeId;
+    }
+    if (filters?.tableId) {
+      where.tableId = filters.tableId;
     }
 
     return this.prisma.sale.findMany({
@@ -71,6 +131,14 @@ export class SalesService {
             name: true,
           },
         },
+        member: {
+          select: {
+            id: true,
+            name: true,
+            memberNumber: true,
+          },
+        },
+        table: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -93,6 +161,7 @@ export class SalesService {
           },
         },
         table: true,
+        member: true,
       },
     });
 

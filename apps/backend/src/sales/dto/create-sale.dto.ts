@@ -43,6 +43,10 @@ export class CreateSaleDto {
   @IsString()
   tableId?: string;
 
+  @IsOptional()
+  @IsString()
+  memberId?: string;
+
   @IsNumber()
   subtotal: number;
 
@@ -78,6 +82,7 @@ export class CreateSaleDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SaleItemDto)
-  items: SaleItemDto[];
+  @IsOptional()
+  items?: SaleItemDto[];
 }
 

@@ -63,14 +63,28 @@ export default function POSPage() {
     enabled: !!tableId,
   });
 
-  // Calculate table charge if table is active
+  // Calculate table charge if table is active (excluding paused time)
   const calculateTableCharge = () => {
-    if (!selectedTable || selectedTable.status !== 'OCCUPIED' || !selectedTable.startedAt) {
+    if (!selectedTable || !selectedTable.startedAt) {
       return 0;
     }
+    
+    // Only charge if table is OCCUPIED (not paused or available)
+    if (selectedTable.status !== 'OCCUPIED') {
+      return 0;
+    }
+    
     const start = new Date(selectedTable.startedAt).getTime();
     const now = Date.now();
-    const hours = (now - start) / (1000 * 60 * 60);
+    const totalElapsed = now - start;
+    
+    // Get total paused time
+    const totalPausedMs = selectedTable.totalPausedMs || 0;
+    
+    // Calculate active time (excluding paused time)
+    const activeTimeMs = totalElapsed - totalPausedMs;
+    const hours = activeTimeMs / (1000 * 60 * 60);
+    
     return hours * Number(selectedTable.ratePerHour);
   };
 
@@ -133,29 +147,26 @@ export default function POSPage() {
     cashReceived?: number;
     change?: number;
   }) => {
-    // Stop table if selected
-    if (tableId && selectedTable?.status === 'OCCUPIED') {
-      try {
-        await api.post(`/tables/${tableId}/stop`, {});
-      } catch (error) {
-        console.error('Error stopping table:', error);
-      }
-    }
+    // Calculate totals from items
+    const itemsSubtotal = items.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    const itemsDiscount = items.reduce((sum, item) => sum + (item.discount || 0), 0);
+    const itemsTax = items.reduce((sum, item) => sum + (item.tax || 0), 0);
 
+    // Create sale data - tableId is optional (allows sales without table)
     const saleData = {
-      tableId: tableId || undefined,
+      tableId: tableId || undefined, // Can be undefined for non-table sales
       items: items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        discount: item.discount,
-        tax: item.tax,
-        subtotal: item.subtotal,
+        discount: item.discount || 0,
+        tax: item.tax || 0,
+        subtotal: item.subtotal || 0,
         notes: item.notes,
       })),
-      subtotal: subtotal + tableCharge,
-      discount: discount,
-      tax: tax + tableChargeTax,
+      subtotal: itemsSubtotal + tableCharge,
+      discount: itemsDiscount,
+      tax: itemsTax + tableChargeTax,
       total: finalTotal,
       paymentMethod: paymentData.paymentMethod,
       cashReceived: paymentData.cashReceived,
@@ -165,7 +176,19 @@ export default function POSPage() {
 
     const result = await createSaleMutation.mutateAsync(saleData);
     
-    // Print receipt if Electron
+    // Stop table if selected (whether OCCUPIED or PAUSED) - after sale is created
+    if (tableId && (selectedTable?.status === 'OCCUPIED' || selectedTable?.status === 'PAUSED')) {
+      try {
+        await api.post(`/tables/${tableId}/stop`, {
+          paymentAmount: paymentData.cashReceived || finalTotal,
+        });
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      } catch (error) {
+        console.error('Error stopping table:', error);
+      }
+    }
+    
+    // Print receipt/bill if Electron
     if (result?.id && window.electronAPI) {
       setTimeout(() => handlePrintReceipt(result.id), 500);
     }
@@ -185,31 +208,50 @@ export default function POSPage() {
         }
 
         if (sale) {
+          // Calculate table charge from sale subtotal vs items subtotal
+          const itemsSubtotal = (sale.items || []).reduce(
+            (sum: number, item: any) => sum + Number(item.subtotal || 0),
+            0
+          );
+          const tableCharge = Number(sale.subtotal) - itemsSubtotal;
+
           const lines = [
-            'SNOOKER POS',
-            '================',
+            '═══════════════════════',
+            '    SNOOKER POS',
+            '═══════════════════════',
             `Receipt #${sale.receiptNumber || sale.id}`,
             `Date: ${new Date(sale.createdAt).toLocaleString()}`,
-            sale.table ? `Table: ${sale.table.tableNumber || sale.table}` : '',
+            '',
+            sale.table ? `Table: ${sale.table.tableNumber || sale.table}` : 'Walk-in Sale',
             sale.employee ? `Staff: ${sale.employee.name || sale.employee}` : '',
             '',
-            'Items:',
+            '───────────────────────',
+            'ITEMS:',
+            '───────────────────────',
             ...(sale.items || []).map(
               (item: any) =>
                 `${item.product?.name || 'Item'} x${item.quantity} @ $${(item.unitPrice || 0).toFixed(2)} = $${(item.subtotal || 0).toFixed(2)}`,
             ),
+            ...(tableCharge > 0 ? [
+              '',
+              `Table Charge: $${tableCharge.toFixed(2)}`,
+            ] : []),
             '',
-            '----------------',
+            '───────────────────────',
             `Subtotal: $${Number(sale.subtotal).toFixed(2)}`,
-            sale.discount && sale.discount > 0 ? `Discount: -$${Number(sale.discount).toFixed(2)}` : '',
+            ...(sale.discount && sale.discount > 0 ? [`Discount: -$${Number(sale.discount).toFixed(2)}`] : []),
             `Tax: $${Number(sale.tax).toFixed(2)}`,
-            '----------------',
-            `Total: $${Number(sale.total).toFixed(2)}`,
-            `Payment: ${sale.paymentMethod}`,
-            sale.cashReceived ? `Cash Received: $${Number(sale.cashReceived).toFixed(2)}` : '',
-            sale.change && sale.change > 0 ? `Change: $${Number(sale.change).toFixed(2)}` : '',
+            '───────────────────────',
+            `TOTAL: $${Number(sale.total).toFixed(2)}`,
             '',
-            'Thank you for your visit!',
+            `Payment Method: ${sale.paymentMethod}`,
+            ...(sale.cashReceived ? [`Cash Received: $${Number(sale.cashReceived).toFixed(2)}`] : []),
+            ...(sale.change && sale.change > 0 ? [`Change: $${Number(sale.change).toFixed(2)}`] : []),
+            '',
+            '═══════════════════════',
+            '  Thank you for your',
+            '        visit!',
+            '═══════════════════════',
             '',
           ].filter(Boolean);
 
@@ -257,6 +299,15 @@ export default function POSPage() {
         <TableSelector
           selectedTableId={tableId}
           onSelectTable={setTable}
+          onCheckout={(tableId) => {
+            setTable(tableId);
+            setCartOpen(true);
+            handleCheckout();
+          }}
+          onStopTimer={(tableId) => {
+            // Table stopped, refresh data
+            queryClient.invalidateQueries({ queryKey: ['tables'] });
+          }}
         />
 
         {/* Product Grid */}
@@ -282,7 +333,7 @@ export default function POSPage() {
                   {product.name}
                 </Typography>
                 <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
-                  ${product.price.toFixed(2)}
+                  ${Number(product.price).toFixed(2)}
                 </Typography>
                 {product.stock < 10 && (
                   <Chip

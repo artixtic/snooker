@@ -13,6 +13,10 @@ import {
   TextField,
   Grid,
 } from '@mui/material';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import StopIcon from '@mui/icons-material/Stop';
+import PaymentIcon from '@mui/icons-material/Payment';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -20,9 +24,11 @@ import api from '@/lib/api';
 interface TableSelectorProps {
   selectedTableId: string | null;
   onSelectTable: (tableId: string | null) => void;
+  onCheckout?: (tableId: string) => void;
+  onStopTimer?: (tableId: string) => void;
 }
 
-export function TableSelector({ selectedTableId, onSelectTable }: TableSelectorProps) {
+export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onStopTimer }: TableSelectorProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [ratePerHour, setRatePerHour] = useState('10');
   const queryClient = useQueryClient();
@@ -47,6 +53,39 @@ export function TableSelector({ selectedTableId, onSelectTable }: TableSelectorP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       setDialogOpen(false);
+    },
+  });
+
+  const pauseTableMutation = useMutation({
+    mutationFn: async (tableId: string) => {
+      const response = await api.post(`/tables/${tableId}/pause`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+  });
+
+  const resumeTableMutation = useMutation({
+    mutationFn: async (tableId: string) => {
+      const response = await api.post(`/tables/${tableId}/resume`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+  });
+
+  const stopTableMutation = useMutation({
+    mutationFn: async (tableId: string) => {
+      const response = await api.post(`/tables/${tableId}/stop`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      if (onStopTimer) {
+        onStopTimer(selectedTableId!);
+      }
     },
   });
 
@@ -112,14 +151,94 @@ export function TableSelector({ selectedTableId, onSelectTable }: TableSelectorP
 
         {selectedTable && (
           <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Selected: Table {selectedTable.tableNumber}
-            </Typography>
-            {selectedTable.status === 'OCCUPIED' && selectedTable.startedAt && (
-              <TableTimerDisplay
-                startedAt={selectedTable.startedAt}
-                ratePerHour={Number(selectedTable.ratePerHour)}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2">
+                Selected: Table {selectedTable.tableNumber}
+              </Typography>
+              <Chip
+                label={selectedTable.status}
+                color={
+                  selectedTable.status === 'OCCUPIED'
+                    ? 'warning'
+                    : selectedTable.status === 'PAUSED'
+                    ? 'default'
+                    : 'success'
+                }
+                size="small"
               />
+            </Box>
+            {(selectedTable.status === 'OCCUPIED' || selectedTable.status === 'PAUSED') && selectedTable.startedAt && (
+              <>
+                <TableTimerDisplay
+                  startedAt={selectedTable.startedAt}
+                  ratePerHour={Number(selectedTable.ratePerHour)}
+                  status={selectedTable.status}
+                  pausedAt={selectedTable.pausedAt}
+                  totalPausedMs={selectedTable.totalPausedMs || 0}
+                  lastResumedAt={selectedTable.lastResumedAt}
+                />
+                <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+                  {selectedTable.status === 'OCCUPIED' ? (
+                    <>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        size="small"
+                        startIcon={<PauseIcon />}
+                        onClick={() => pauseTableMutation.mutate(selectedTable.id)}
+                        disabled={pauseTableMutation.isPending}
+                        sx={{ flex: 1, minWidth: 120 }}
+                      >
+                        Pause Timer
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        startIcon={<StopIcon />}
+                        onClick={() => {
+                          if (confirm('Stop timer and checkout? This will finalize the table session.')) {
+                            stopTableMutation.mutate(selectedTable.id);
+                          }
+                        }}
+                        disabled={stopTableMutation.isPending}
+                        sx={{ flex: 1, minWidth: 120 }}
+                      >
+                        Stop Timer
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      startIcon={<PlayCircleIcon />}
+                      onClick={() => resumeTableMutation.mutate(selectedTable.id)}
+                      disabled={resumeTableMutation.isPending}
+                      fullWidth
+                    >
+                      Resume Timer
+                    </Button>
+                  )}
+                  {(selectedTable.status === 'OCCUPIED' || selectedTable.status === 'PAUSED') && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      startIcon={<PaymentIcon />}
+                      onClick={() => {
+                        if (onCheckout) {
+                          onCheckout(selectedTable.id);
+                        }
+                      }}
+                      fullWidth
+                      sx={{ mt: 1 }}
+                    >
+                      Checkout & Pay
+                    </Button>
+                  )}
+                </Box>
+              </>
             )}
           </Box>
         )}
@@ -164,27 +283,51 @@ export function TableSelector({ selectedTableId, onSelectTable }: TableSelectorP
 function TableTimerDisplay({
   startedAt,
   ratePerHour,
+  status,
+  pausedAt,
+  totalPausedMs = 0,
+  lastResumedAt,
 }: {
   startedAt: string | Date;
   ratePerHour: number;
+  status?: string;
+  pausedAt?: string | Date | null;
+  totalPausedMs?: number;
+  lastResumedAt?: string | Date | null;
 }) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentCharge, setCurrentCharge] = useState(0);
 
   useEffect(() => {
+    if (status === 'PAUSED') {
+      // Don't update timer when paused
+      return;
+    }
+    
     const interval = setInterval(() => {
       const start = new Date(startedAt).getTime();
       const now = Date.now();
-      const elapsed = Math.floor((now - start) / 1000);
-      const hours = elapsed / 3600;
+      const totalElapsed = now - start;
+      
+      // Calculate total paused time
+      let currentPauseMs = 0;
+      if (status === 'PAUSED' && pausedAt && lastResumedAt) {
+        currentPauseMs = new Date(pausedAt).getTime() - new Date(lastResumedAt).getTime();
+      }
+      
+      const totalPaused = (totalPausedMs || 0) + currentPauseMs;
+      const activeTime = totalElapsed - totalPaused;
+      
+      const elapsed = Math.floor(activeTime / 1000);
+      const hours = activeTime / (1000 * 60 * 60);
       const charge = hours * ratePerHour;
 
-      setElapsedTime(elapsed);
-      setCurrentCharge(charge);
+      setElapsedTime(Math.max(0, elapsed));
+      setCurrentCharge(Math.max(0, charge));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startedAt, ratePerHour]);
+  }, [startedAt, ratePerHour, status, pausedAt, totalPausedMs, lastResumedAt]);
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -196,11 +339,16 @@ function TableTimerDisplay({
   return (
     <Box>
       <Typography variant="body2" color="text.secondary">
-        Time: {formatTime(elapsedTime)}
+        {status === 'PAUSED' ? 'Time (Paused):' : 'Time:'} {formatTime(elapsedTime)}
       </Typography>
-      <Typography variant="h6" color="primary">
+      <Typography variant="h6" color={status === 'PAUSED' ? 'warning.main' : 'primary'}>
         Charge: ${currentCharge.toFixed(2)}
       </Typography>
+      {status === 'PAUSED' && (
+        <Typography variant="caption" color="text.secondary">
+          Timer paused - not charging
+        </Typography>
+      )}
     </Box>
   );
 }

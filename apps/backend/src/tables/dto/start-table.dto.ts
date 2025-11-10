@@ -1,7 +1,8 @@
-import { IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StartTableDto {
+  @IsOptional()
   @IsNumber()
   @Type(() => Number)
   ratePerHour?: number;
@@ -10,5 +11,9 @@ export class StartTableDto {
   @IsNumber()
   @Type(() => Number)
   discount?: number;
+
+  @IsOptional()
+  @IsString()
+  memberId?: string;
 }
 

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -15,22 +17,40 @@ export class AuthService {
   ) {}
 
   async validateUser(username: string, password: string): Promise<any> {
-    const user = await this.usersService.findByUsername(username);
-    if (!user) {
+    this.logger.debug(`Attempting to validate user: ${username}`);
+    
+    try {
+      const user = await this.usersService.findByUsername(username);
+      
+      if (!user) {
+        this.logger.warn(`User not found: ${username}`);
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      this.logger.debug(`User found: ${username}, checking password...`);
+      
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      
+      if (!isPasswordValid) {
+        this.logger.warn(`Invalid password for user: ${username}`);
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      if (user.deleted) {
+        this.logger.warn(`Account disabled for user: ${username}`);
+        throw new UnauthorizedException('Account is disabled');
+      }
+
+      this.logger.log(`User validated successfully: ${username}`);
+      const { password: _, ...result } = user;
+      return result;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error(`Error validating user ${username}: ${error.message}`, error.stack);
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    if (user.deleted) {
-      throw new UnauthorizedException('Account is disabled');
-    }
-
-    const { password: _, ...result } = user;
-    return result;
   }
 
   async login(user: any) {

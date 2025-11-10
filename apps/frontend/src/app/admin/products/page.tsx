@@ -207,7 +207,7 @@ export default function AdminProductsPage() {
               <TableRow key={product.id}>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.sku || '-'}</TableCell>
-                <TableCell>${product.price.toFixed(2)}</TableCell>
+                <TableCell>${Number(product.price).toFixed(2)}</TableCell>
                 <TableCell>
                   <Chip
                     label={product.stock}

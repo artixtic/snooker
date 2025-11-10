@@ -10,7 +10,7 @@ export default function Home() {
     // Check if user is logged in
     const token = localStorage.getItem('accessToken');
     if (token) {
-      router.push('/pos');
+      router.push('/dashboard');
     } else {
       router.push('/login');
     }

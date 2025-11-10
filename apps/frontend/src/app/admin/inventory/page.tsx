@@ -206,7 +206,7 @@ export default function AdminInventoryPage() {
                   />
                 </TableCell>
                 <TableCell>{product.category || '-'}</TableCell>
-                <TableCell>${product.price.toFixed(2)}</TableCell>
+                <TableCell>${Number(product.price).toFixed(2)}</TableCell>
                 <TableCell align="right">
                   <IconButton
                     size="small"

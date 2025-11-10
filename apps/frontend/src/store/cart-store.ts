@@ -57,7 +57,7 @@ export const useCartStore = create<CartStore>()(
           get().updateQuantity(product.id, existingItem.quantity + quantity);
         } else {
           // Add new item
-          const unitPrice = product.price;
+          const unitPrice = Number(product.price);
           const itemDiscount = 0;
           const itemSubtotal = unitPrice * quantity;
           const itemTax = itemSubtotal * TAX_RATE;
@@ -70,7 +70,7 @@ export const useCartStore = create<CartStore>()(
                 product: {
                   id: product.id,
                   name: product.name,
-                  price: product.price,
+                  price: unitPrice,
                   sku: product.sku,
                   barcode: product.barcode,
                 },

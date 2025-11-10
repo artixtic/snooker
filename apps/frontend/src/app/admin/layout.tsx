@@ -25,6 +25,9 @@ import SyncProblemIcon from '@mui/icons-material/SyncProblem';
 import PeopleIcon from '@mui/icons-material/People';
 import HistoryIcon from '@mui/icons-material/History';
 import LogoutIcon from '@mui/icons-material/Logout';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/auth-guard';
@@ -45,6 +48,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { text: 'Products', icon: <InventoryIcon />, path: '/admin/products' },
     { text: 'Inventory', icon: <InventoryIcon />, path: '/admin/inventory' },
     { text: 'Tables', icon: <TableRestaurantIcon />, path: '/admin/tables' },
+    { text: 'Matches', icon: <SportsEsportsIcon />, path: '/admin/matches' },
+    { text: 'Match History', icon: <ListAltIcon />, path: '/admin/match-history' },
+    { text: 'Tournaments', icon: <EmojiEventsIcon />, path: '/admin/tournaments' },
     { text: 'Shifts', icon: <WorkIcon />, path: '/admin/shifts' },
     { text: 'Sales', icon: <ReceiptIcon />, path: '/admin/sales' },
     { text: 'Users', icon: <PeopleIcon />, path: '/admin/users' },

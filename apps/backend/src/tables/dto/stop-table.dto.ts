@@ -6,5 +6,10 @@ export class StopTableDto {
   @IsNumber()
   @Type(() => Number)
   discount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  paymentAmount?: number;
 }
 

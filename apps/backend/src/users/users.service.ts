@@ -9,15 +9,25 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findByUsername(username: string) {
-    return this.prisma.user.findUnique({
-      where: { username, deleted: false },
+    return this.prisma.user.findFirst({
+      where: { 
+        username,
+        deleted: false 
+      },
     });
   }
 
   async findById(id: string) {
-    return this.prisma.user.findUnique({
-      where: { id, deleted: false },
+    const user = await this.prisma.user.findUnique({
+      where: { id },
     });
+    
+    // Check if user exists and is not deleted
+    if (!user || user.deleted) {
+      return null;
+    }
+    
+    return user;
   }
 
   async findAll() {

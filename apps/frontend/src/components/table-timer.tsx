@@ -11,6 +11,8 @@ import {
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
@@ -19,6 +21,9 @@ interface TableTimerProps {
   tableNumber: number;
   ratePerHour: number;
   startedAt?: Date | string;
+  pausedAt?: Date | string | null;
+  totalPausedMs?: number;
+  lastResumedAt?: Date | string | null;
   status: string;
   onStart?: () => void;
   onStop?: () => void;
@@ -29,6 +34,9 @@ export function TableTimer({
   tableNumber,
   ratePerHour,
   startedAt,
+  pausedAt,
+  totalPausedMs = 0,
+  lastResumedAt,
   status,
   onStart,
   onStop,
@@ -48,6 +56,26 @@ export function TableTimer({
     },
   });
 
+  const pauseTableMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/tables/${tableId}/pause`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+  });
+
+  const resumeTableMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/tables/${tableId}/resume`, {});
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+  });
+
   const stopTableMutation = useMutation({
     mutationFn: async () => {
       const response = await api.post(`/tables/${tableId}/stop`, {});
@@ -60,16 +88,31 @@ export function TableTimer({
   });
 
   useEffect(() => {
-    if (status === 'OCCUPIED' && startedAt) {
+    if ((status === 'OCCUPIED' || status === 'PAUSED') && startedAt) {
       const interval = setInterval(() => {
         const start = new Date(startedAt).getTime();
         const now = Date.now();
-        const elapsed = Math.floor((now - start) / 1000); // seconds
-        const hours = elapsed / 3600;
+        const totalElapsed = now - start;
+        
+        // Calculate total paused time
+        let currentPauseMs = 0;
+        if (status === 'PAUSED' && pausedAt && lastResumedAt) {
+          // Currently paused - add time since last resume until pause
+          currentPauseMs = new Date(pausedAt).getTime() - new Date(lastResumedAt).getTime();
+        } else if (status === 'PAUSED' && pausedAt && startedAt) {
+          // Paused but no lastResumedAt - use startedAt
+          currentPauseMs = new Date(pausedAt).getTime() - start;
+        }
+        
+        const totalPaused = (totalPausedMs || 0) + currentPauseMs;
+        const activeTime = totalElapsed - totalPaused;
+        
+        const elapsed = Math.floor(activeTime / 1000); // seconds
+        const hours = activeTime / (1000 * 60 * 60);
         const charge = hours * ratePerHour;
 
-        setElapsedTime(elapsed);
-        setCurrentCharge(charge);
+        setElapsedTime(Math.max(0, elapsed));
+        setCurrentCharge(Math.max(0, charge));
       }, 1000);
 
       return () => clearInterval(interval);
@@ -77,7 +120,7 @@ export function TableTimer({
       setElapsedTime(0);
       setCurrentCharge(0);
     }
-  }, [status, startedAt, ratePerHour]);
+  }, [status, startedAt, pausedAt, totalPausedMs, lastResumedAt, ratePerHour]);
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -88,6 +131,14 @@ export function TableTimer({
 
   const handleStart = () => {
     startTableMutation.mutate({ ratePerHour: ratePerHour || 10 });
+  };
+
+  const handlePause = () => {
+    pauseTableMutation.mutate();
+  };
+
+  const handleResume = () => {
+    resumeTableMutation.mutate();
   };
 
   const handleStop = () => {
@@ -102,20 +153,37 @@ export function TableTimer({
         <Typography variant="h6">Table {tableNumber}</Typography>
         <Chip
           label={status}
-          color={status === 'OCCUPIED' ? 'warning' : 'success'}
+          color={
+            status === 'OCCUPIED' 
+              ? 'warning' 
+              : status === 'PAUSED'
+              ? 'default'
+              : 'success'
+          }
           size="small"
         />
       </Box>
 
-      {status === 'OCCUPIED' ? (
+      {status === 'OCCUPIED' || status === 'PAUSED' ? (
         <>
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Elapsed Time
+              {status === 'PAUSED' ? 'Time (Paused)' : 'Elapsed Time'}
             </Typography>
-            <Typography variant="h4" color="primary">
+            <Typography 
+              variant="h4" 
+              color={status === 'PAUSED' ? 'warning.main' : 'primary'}
+            >
               {formatTime(elapsedTime)}
             </Typography>
+            {status === 'PAUSED' && (
+              <Chip 
+                label="PAUSED" 
+                color="warning" 
+                size="small" 
+                sx={{ mt: 1 }}
+              />
+            )}
           </Box>
 
           <Box sx={{ mb: 2 }}>
@@ -126,20 +194,45 @@ export function TableTimer({
               ${currentCharge.toFixed(2)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              @ ${ratePerHour}/hour
+              @ ${ratePerHour}/hour {status === 'PAUSED' && '(Paused - not charging)'}
             </Typography>
           </Box>
 
-          <Button
-            fullWidth
-            variant="contained"
-            color="error"
-            startIcon={<StopIcon />}
-            onClick={handleStop}
-            disabled={stopTableMutation.isPending}
-          >
-            Stop Table
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {status === 'OCCUPIED' ? (
+              <Button
+                fullWidth
+                variant="outlined"
+                color="warning"
+                startIcon={<PauseIcon />}
+                onClick={handlePause}
+                disabled={pauseTableMutation.isPending}
+              >
+                Pause
+              </Button>
+            ) : (
+              <Button
+                fullWidth
+                variant="contained"
+                color="success"
+                startIcon={<PlayCircleIcon />}
+                onClick={handleResume}
+                disabled={resumeTableMutation.isPending}
+              >
+                Resume
+              </Button>
+            )}
+            <Button
+              fullWidth
+              variant="contained"
+              color="error"
+              startIcon={<StopIcon />}
+              onClick={handleStop}
+              disabled={stopTableMutation.isPending}
+            >
+              Stop
+            </Button>
+          </Box>
         </>
       ) : (
         <>
@@ -165,7 +258,10 @@ export function TableTimer({
         </>
       )}
 
-      {(startTableMutation.isPending || stopTableMutation.isPending) && (
+      {(startTableMutation.isPending || 
+        stopTableMutation.isPending || 
+        pauseTableMutation.isPending || 
+        resumeTableMutation.isPending) && (
         <LinearProgress sx={{ mt: 2 }} />
       )}
     </Paper>

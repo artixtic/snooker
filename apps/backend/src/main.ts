@@ -3,41 +3,47 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { DatabaseInitService } from './prisma/database-init.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  try {
+    const app = await NestFactory.create(AppModule, {
+      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    });
 
-  // Initialize database and run migrations before starting the server
-  const databaseInitService = app.get(DatabaseInitService);
-  await databaseInitService.initialize();
+    // Cookie parser for refresh tokens
+    app.use(cookieParser());
 
-  // Cookie parser for refresh tokens
-  app.use(cookieParser());
+    const configService = app.get(ConfigService);
+    const port = configService.get('PORT') || 3001;
+    const corsOrigin = configService.get('CORS_ORIGIN') || 'http://localhost:3000';
 
-  const configService = app.get(ConfigService);
-  const port = configService.get('PORT') || 3001;
-  const corsOrigin = configService.get('CORS_ORIGIN') || 'http://localhost:3000';
+    // Enable CORS for frontend
+    app.enableCors({
+      origin: corsOrigin,
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
+    });
 
-  // Enable CORS for frontend
-  app.enableCors({
-    origin: corsOrigin,
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
-  });
+    // Global validation pipe
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
 
-  // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  await app.listen(port);
-  console.log(`🚀 Backend server running on http://localhost:${port}`);
+    await app.listen(port);
+    console.log(`🚀 Backend server running on http://localhost:${port}`);
+  } catch (error: any) {
+    console.error('❌ Failed to start application:', error.message);
+    console.error('Stack:', error.stack);
+    process.exit(1);
+  }
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('❌ Unhandled error in bootstrap:', error);
+  process.exit(1);
+});
 
