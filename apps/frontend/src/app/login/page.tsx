@@ -32,32 +32,84 @@ export default function LoginPage() {
         localStorage.setItem('userId', response.data.user.id);
       }
       
-      router.push('/pos');
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
     }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Paper sx={{ p: 4, width: '100%' }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center">
-            Snooker POS
-          </Typography>
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Sign in to continue
-          </Typography>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '50px 50px',
+          animation: 'move 20s linear infinite',
+          '@keyframes move': {
+            '0%': { transform: 'translate(0, 0)' },
+            '100%': { transform: 'translate(50px, 50px)' },
+          },
+        },
+      }}
+    >
+      <Container maxWidth="sm" sx={{ position: 'relative', zIndex: 1 }}>
+        <Paper 
+          sx={{ 
+            p: 5, 
+            width: '100%',
+            borderRadius: 4,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+          }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography 
+              variant="h3" 
+              component="h1" 
+              gutterBottom 
+              sx={{ 
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1,
+              }}
+            >
+              🎱 Smart Cue
+            </Typography>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: 'text.secondary',
+                fontSize: '1.1rem',
+              }}
+            >
+              Sign in to continue
+            </Typography>
+          </Box>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3,
+                borderRadius: 2,
+                boxShadow: '0 4px 15px rgba(244, 67, 54, 0.2)',
+              }}
+            >
               {error}
             </Alert>
           )}
@@ -72,6 +124,18 @@ export default function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: '#667eea',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                  },
+                },
+              }}
             />
             <TextField
               fullWidth
@@ -82,20 +146,47 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: '#667eea',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                  },
+                },
+              }}
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+              sx={{ 
+                mt: 4, 
+                mb: 2,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                  boxShadow: '0 12px 35px rgba(102, 126, 234, 0.6)',
+                  transform: 'translateY(-2px)',
+                },
+                transition: 'all 0.3s ease',
+              }}
               size="large"
             >
               Sign In
             </Button>
           </form>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 }
 

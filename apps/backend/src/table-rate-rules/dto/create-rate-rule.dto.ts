@@ -29,10 +29,6 @@ export class CreateRateRuleDto {
   daysOfWeek?: string;
 
   @IsOptional()
-  @IsString()
-  memberType?: string;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   discountPercent?: number;

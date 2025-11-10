@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { StartTableDto } from './dto/start-table.dto';
 import { StopTableDto } from './dto/stop-table.dto';
+import { CreateTableDto } from './dto/create-table.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -13,6 +14,16 @@ export class TablesController {
   @Get()
   findAll() {
     return this.tablesService.findAll();
+  }
+
+  @Post()
+  create(@Body() createTableDto: CreateTableDto) {
+    return this.tablesService.create(createTableDto);
+  }
+
+  @Delete('all')
+  removeAll() {
+    return this.tablesService.removeAll();
   }
 
   @Get('active')
@@ -45,14 +56,14 @@ export class TablesController {
     return this.tablesService.stop(id, dto, user.id);
   }
 
-  @Patch(':id/member')
-  updateMember(@Param('id') id: string, @Body('memberId') memberId: string) {
-    return this.tablesService.updateMember(id, memberId);
-  }
-
   @Post(':id/reset')
   reset(@Param('id') id: string) {
     return this.tablesService.reset(id);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.tablesService.remove(id);
   }
 }
 

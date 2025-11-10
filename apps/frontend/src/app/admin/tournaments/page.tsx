@@ -42,12 +42,10 @@ interface Tournament {
   description: string | null;
   participants: Array<{
     id: string;
-    playerId: string | null;
-    memberId: string | null;
+    playerId: string;
     seed: number | null;
     status: string;
     player?: { id: string; name: string };
-    member?: { id: string; name: string; memberNumber: string };
   }>;
   matches: Array<{
     id: string;
@@ -71,10 +69,10 @@ export default function TournamentsPage() {
     },
   });
 
-  const { data: members = [] } = useQuery({
-    queryKey: ['members'],
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
     queryFn: async () => {
-      const response = await api.get('/members');
+      const response = await api.get('/users');
       return response.data;
     },
   });
@@ -128,8 +126,6 @@ export default function TournamentsPage() {
 
   const getPlayerName = (participant: any) => {
     if (participant.player) return participant.player.name;
-    if (participant.member)
-      return `${participant.member.name} (${participant.member.memberNumber})`;
     return 'Unknown';
   };
 
@@ -272,7 +268,7 @@ export default function TournamentsPage() {
         <DialogContent>
           {selectedTournament && (
             <AddParticipantForm
-              members={members}
+              users={users}
               onSubmit={(data) =>
                 addParticipantMutation.mutate({ id: selectedTournament.id, data })
               }
@@ -372,14 +368,14 @@ function CreateTournamentForm({ onSubmit }: any) {
   );
 }
 
-function AddParticipantForm({ members, onSubmit }: any) {
-  const [memberId, setMemberId] = useState('');
+function AddParticipantForm({ users, onSubmit }: any) {
+  const [playerId, setPlayerId] = useState('');
   const [seed, setSeed] = useState<number | ''>('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
-      memberId: memberId || undefined,
+      playerId: playerId || undefined,
       seed: seed || undefined,
     });
   };
@@ -387,16 +383,16 @@ function AddParticipantForm({ members, onSubmit }: any) {
   return (
     <form onSubmit={handleSubmit}>
       <FormControl fullWidth margin="normal">
-        <InputLabel>Member</InputLabel>
+        <InputLabel>Player</InputLabel>
         <Select
-          value={memberId}
-          onChange={(e) => setMemberId(e.target.value)}
+          value={playerId}
+          onChange={(e) => setPlayerId(e.target.value)}
           required
         >
-          <MenuItem value="">Select Member</MenuItem>
-          {members.map((member: any) => (
-            <MenuItem key={member.id} value={member.id}>
-              {member.name} ({member.memberNumber})
+          <MenuItem value="">Select Player</MenuItem>
+          {users.map((user: any) => (
+            <MenuItem key={user.id} value={user.id}>
+              {user.name} ({user.username})
             </MenuItem>
           ))}
         </Select>

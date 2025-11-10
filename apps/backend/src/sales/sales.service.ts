@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 
@@ -7,50 +7,83 @@ export class SalesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createSaleDto: CreateSaleDto, employeeId: string) {
-    // Generate receipt number
-    const receiptNumber = await this.generateReceiptNumber();
-
-    // If credit payment, validate member and credit limit
-    if (createSaleDto.paymentMethod === 'CREDIT') {
-      if (!createSaleDto.memberId) {
-        throw new NotFoundException('Member ID is required for credit payments');
-      }
-
-      const member = await this.prisma.member.findUnique({
-        where: { id: createSaleDto.memberId },
-      });
-
-      if (!member) {
-        throw new NotFoundException(`Member with ID ${createSaleDto.memberId} not found`);
-      }
-
-      const newBalance = Number(member.balance) + createSaleDto.total;
-      if (newBalance > Number(member.creditLimit)) {
-        throw new Error(
-          `Credit limit exceeded. Available credit: ${Number(member.creditLimit) - Number(member.balance)}`,
-        );
-      }
-    }
-
-    // Create sale with items and credit transaction if needed
+    // Use transaction to ensure atomicity
     return this.prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.create({
-        data: {
-          ...createSaleDto,
-          receiptNumber,
-          employeeId,
-          items: {
-            create: (createSaleDto.items || []).map((item) => ({
+      // Generate receipt number first
+      const receiptNumber = await this.generateReceiptNumber(tx);
+
+      // Validate stock availability for all items
+      if (createSaleDto.items && createSaleDto.items.length > 0) {
+        for (const item of createSaleDto.items) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+          });
+
+          if (!product) {
+            throw new NotFoundException(`Product with ID ${item.productId} not found`);
+          }
+
+          if (product.deleted) {
+            throw new BadRequestException(`Product ${product.name} has been deleted`);
+          }
+
+          if (product.stock < item.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`
+            );
+          }
+        }
+
+        // Update stock and create inventory movements
+        for (const item of createSaleDto.items) {
+          // Decrement stock
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { decrement: item.quantity },
+            },
+          });
+
+          // Create inventory movement record
+          await tx.inventoryMovement.create({
+            data: {
               productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              discount: item.discount,
-              tax: item.tax,
-              subtotal: item.subtotal,
-              notes: item.notes,
-            })),
-          },
+              change: -item.quantity, // Negative for sale
+              reason: `Sale - Receipt ${receiptNumber}`,
+              userId: employeeId,
+            },
+          });
+        }
+      }
+
+      // Create sale with items
+      const saleData: any = {
+        ...createSaleDto,
+        receiptNumber,
+        employeeId,
+        items: {
+          create: (createSaleDto.items || []).map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount !== undefined ? item.discount : null,
+            tax: item.tax !== undefined ? item.tax : null,
+            subtotal: item.subtotal,
+            notes: item.notes,
+          })),
         },
+      };
+      
+      // Handle optional tax field - set to 0 if undefined (until migration makes it nullable)
+      // TODO: After migration, change this to null or omit the field
+      if (createSaleDto.tax !== undefined && createSaleDto.tax !== null) {
+        saleData.tax = createSaleDto.tax;
+      } else {
+        saleData.tax = 0; // Temporary: set to 0 until database migration is applied
+      }
+      
+      const sale = await tx.sale.create({
+        data: saleData,
         include: {
           items: {
             include: {
@@ -65,39 +98,8 @@ export class SalesService {
             },
           },
           table: true,
-          member: true,
         },
       });
-
-      // Create credit transaction if payment is credit
-      if (createSaleDto.paymentMethod === 'CREDIT' && createSaleDto.memberId) {
-        const member = await tx.member.findUnique({
-          where: { id: createSaleDto.memberId },
-        });
-
-        if (member) {
-          const balanceBefore = Number(member.balance);
-          const balanceAfter = balanceBefore + createSaleDto.total;
-
-          await tx.creditTransaction.create({
-            data: {
-              memberId: createSaleDto.memberId,
-              saleId: sale.id,
-              type: 'SALE',
-              amount: createSaleDto.total,
-              balanceBefore,
-              balanceAfter,
-              description: `Sale ${receiptNumber}`,
-              employeeId,
-            },
-          });
-
-          await tx.member.update({
-            where: { id: createSaleDto.memberId },
-            data: { balance: balanceAfter },
-          });
-        }
-      }
 
       return sale;
     });
@@ -131,13 +133,6 @@ export class SalesService {
             name: true,
           },
         },
-        member: {
-          select: {
-            id: true,
-            name: true,
-            memberNumber: true,
-          },
-        },
         table: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -161,7 +156,6 @@ export class SalesService {
           },
         },
         table: true,
-        member: true,
       },
     });
 
@@ -172,10 +166,11 @@ export class SalesService {
     return sale;
   }
 
-  private async generateReceiptNumber(): Promise<string> {
+  private async generateReceiptNumber(tx?: any): Promise<string> {
+    const prisma = tx || this.prisma;
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await this.prisma.sale.count({
+    const count = await prisma.sale.count({
       where: {
         createdAt: {
           gte: new Date(date.setHours(0, 0, 0, 0)),

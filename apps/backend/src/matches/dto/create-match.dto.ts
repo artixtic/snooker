@@ -3,11 +3,7 @@ import { Type } from 'class-transformer';
 
 export class CreateMatchPlayerDto {
   @IsString()
-  playerId?: string;
-
-  @IsString()
-  @IsOptional()
-  memberId?: string;
+  playerId: string;
 
   @IsOptional()
   seatNumber?: number;

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { AddParticipantDto } from './dto/add-participant.dto';
 import { AdvanceWinnerDto } from './dto/advance-winner.dto';
-import { TournamentStatus, TournamentFormat } from '@prisma/client';
+import { TournamentStatus, TournamentFormat, Prisma } from '@prisma/client';
 
 @Injectable()
 export class TournamentsService {
@@ -28,9 +28,6 @@ export class TournamentsService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },
@@ -62,9 +59,6 @@ export class TournamentsService {
             player: {
               select: { id: true, name: true, username: true },
             },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
-            },
           },
         },
         matches: {
@@ -93,9 +87,6 @@ export class TournamentsService {
             player: {
               select: { id: true, name: true, username: true },
             },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
-            },
           },
         },
         matches: {
@@ -106,9 +97,6 @@ export class TournamentsService {
                   include: {
                     player: {
                       select: { id: true, name: true, username: true },
-                    },
-                    member: {
-                      select: { id: true, name: true, memberNumber: true },
                     },
                   },
                 },
@@ -123,7 +111,25 @@ export class TournamentsService {
       throw new NotFoundException(`Tournament with ID ${id} not found`);
     }
 
-    return tournament;
+    return tournament as Prisma.TournamentGetPayload<{
+      include: {
+        creator: { select: { id: true; name: true; username: true } };
+        participants: { include: { player: { select: { id: true; name: true; username: true } } } };
+        matches: {
+          include: {
+            match: {
+              include: {
+                players: {
+                  include: {
+                    player: { select: { id: true; name: true; username: true } };
+                  };
+                };
+              };
+            };
+          };
+        };
+      };
+    }>;
   }
 
   async addParticipant(id: string, addParticipantDto: AddParticipantDto) {
@@ -137,10 +143,7 @@ export class TournamentsService {
     const existing = await this.prisma.tournamentPlayer.findFirst({
       where: {
         tournamentId: id,
-        OR: [
-          { playerId: addParticipantDto.playerId || null },
-          { memberId: addParticipantDto.memberId || null },
-        ],
+        playerId: addParticipantDto.playerId,
       },
     });
 
@@ -151,16 +154,12 @@ export class TournamentsService {
     return this.prisma.tournamentPlayer.create({
       data: {
         tournamentId: id,
-        playerId: addParticipantDto.playerId || null,
-        memberId: addParticipantDto.memberId || null,
+        playerId: addParticipantDto.playerId,
         seed: addParticipantDto.seed || null,
       },
       include: {
         player: {
           select: { id: true, name: true, username: true },
-        },
-        member: {
-          select: { id: true, name: true, memberNumber: true },
         },
       },
     });
@@ -169,18 +168,16 @@ export class TournamentsService {
   async addParticipants(tournamentId: string, participantIds: string[]) {
     const participants = await Promise.all(
       participantIds.map(async (participantId) => {
-        // Determine if it's a user or member
+        // Verify user exists
         const user = await this.prisma.user.findUnique({ where: { id: participantId } });
-        const member = user ? null : await this.prisma.member.findUnique({ where: { id: participantId } });
 
-        if (!user && !member) {
+        if (!user) {
           throw new NotFoundException(`Participant with ID ${participantId} not found`);
         }
 
         return {
           tournamentId,
-          playerId: user ? participantId : null,
-          memberId: member ? participantId : null,
+          playerId: participantId,
         };
       }),
     );
@@ -238,7 +235,7 @@ export class TournamentsService {
 
     // Update participant status
     const winner = tournament.participants.find(
-      (p) => p.playerId === winnerId || p.memberId === winnerId,
+      (p) => p.playerId === winnerId,
     );
 
     if (winner) {
@@ -254,16 +251,14 @@ export class TournamentsService {
       });
 
       if (match) {
-        const losers = match.players.filter(
-          (p) => p.playerId !== winnerId && p.memberId !== winnerId,
-        );
+      const losers = match.players.filter(
+        (p) => p.playerId !== winnerId,
+      );
 
-        for (const loser of losers) {
-          const participant = tournament.participants.find(
-            (p) =>
-              (p.playerId && p.playerId === loser.playerId) ||
-              (p.memberId && p.memberId === loser.memberId),
-          );
+      for (const loser of losers) {
+        const participant = tournament.participants.find(
+          (p) => p.playerId === loser.playerId,
+        );
 
           if (participant) {
             await this.prisma.tournamentPlayer.update({

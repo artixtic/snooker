@@ -41,8 +41,7 @@ export class MatchesService {
         score: {},
         players: {
           create: players.map((p, index) => ({
-            playerId: p.playerId || null,
-            memberId: p.memberId || null,
+            playerId: p.playerId,
             seatNumber: p.seatNumber || index + 1,
             score: 0,
           })),
@@ -53,9 +52,6 @@ export class MatchesService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },
@@ -91,9 +87,6 @@ export class MatchesService {
             player: {
               select: { id: true, name: true, username: true },
             },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
-            },
           },
         },
         table: true,
@@ -111,9 +104,6 @@ export class MatchesService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },
@@ -159,9 +149,6 @@ export class MatchesService {
             player: {
               select: { id: true, name: true, username: true },
             },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
-            },
           },
         },
         table: true,
@@ -191,9 +178,6 @@ export class MatchesService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },
@@ -225,9 +209,6 @@ export class MatchesService {
             player: {
               select: { id: true, name: true, username: true },
             },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
-            },
           },
         },
         table: true,
@@ -254,10 +235,10 @@ export class MatchesService {
       const updatePromises = Object.entries(endMatchDto.finalScores).map(
         async ([playerId, score]) => {
           const matchPlayer = match.players.find(
-            (p) => p.playerId === playerId || p.memberId === playerId,
+            (p) => p.playerId === playerId,
           );
 
-          if (matchPlayer) {
+          if (matchPlayer && matchPlayer.playerId) {
             const result = endMatchDto.winnerId === playerId ? 'win' : 'loss';
             await this.prisma.matchPlayer.update({
               where: { id: matchPlayer.id },
@@ -265,29 +246,14 @@ export class MatchesService {
             });
 
             // Update player stats
-            const isUser = !!matchPlayer.playerId;
-            const entityId = matchPlayer.playerId || matchPlayer.memberId;
-            if (entityId) {
-              if (isUser) {
-                await this.prisma.user.update({
-                  where: { id: entityId },
-                  data: {
-                    totalMatches: { increment: 1 },
-                    wins: result === 'win' ? { increment: 1 } : undefined,
-                    losses: result === 'loss' ? { increment: 1 } : undefined,
-                  },
-                });
-              } else {
-                await this.prisma.member.update({
-                  where: { id: entityId },
-                  data: {
-                    totalMatches: { increment: 1 },
-                    wins: result === 'win' ? { increment: 1 } : undefined,
-                    losses: result === 'loss' ? { increment: 1 } : undefined,
-                  },
-                });
-              }
-            }
+            await this.prisma.user.update({
+              where: { id: matchPlayer.playerId },
+              data: {
+                totalMatches: { increment: 1 },
+                wins: result === 'win' ? { increment: 1 } : undefined,
+                losses: result === 'loss' ? { increment: 1 } : undefined,
+              },
+            });
           }
         },
       );
@@ -321,9 +287,6 @@ export class MatchesService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },
@@ -360,9 +323,6 @@ export class MatchesService {
           include: {
             player: {
               select: { id: true, name: true, username: true },
-            },
-            member: {
-              select: { id: true, name: true, memberNumber: true },
             },
           },
         },

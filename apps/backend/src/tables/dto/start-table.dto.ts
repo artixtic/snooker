@@ -11,9 +11,5 @@ export class StartTableDto {
   @IsNumber()
   @Type(() => Number)
   discount?: number;
-
-  @IsOptional()
-  @IsString()
-  memberId?: string;
 }
 

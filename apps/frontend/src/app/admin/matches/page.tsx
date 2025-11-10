@@ -42,13 +42,11 @@ interface Match {
   };
   players: Array<{
     id: string;
-    playerId: string | null;
-    memberId: string | null;
+    playerId: string;
     seatNumber: number;
     score: number;
     result: string | null;
     player?: { id: string; name: string };
-    member?: { id: string; name: string; memberNumber: string };
   }>;
 }
 
@@ -78,10 +76,10 @@ export default function MatchesPage() {
     },
   });
 
-  const { data: members = [] } = useQuery({
-    queryKey: ['members'],
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
     queryFn: async () => {
-      const response = await api.get('/members');
+      const response = await api.get('/users');
       return response.data;
     },
   });
@@ -153,7 +151,6 @@ export default function MatchesPage() {
 
   const getPlayerName = (player: any) => {
     if (player.player) return player.player.name;
-    if (player.member) return `${player.member.name} (${player.member.memberNumber})`;
     return 'Unknown';
   };
 
@@ -250,9 +247,8 @@ export default function MatchesPage() {
                         onClick={() => {
                           const finalScores: any = {};
                           match.players.forEach((p) => {
-                            const playerId = p.playerId || p.memberId;
-                            if (playerId) {
-                              finalScores[playerId] = p.score;
+                            if (p.playerId) {
+                              finalScores[p.playerId] = p.score;
                             }
                           });
                           endMatchMutation.mutate({ id: match.id, finalScores });
@@ -285,7 +281,7 @@ export default function MatchesPage() {
         <DialogContent>
           <CreateMatchForm
             tables={tables}
-            members={members}
+            users={users}
             onSubmit={(data) => createMatchMutation.mutate(data)}
           />
         </DialogContent>
@@ -307,7 +303,7 @@ export default function MatchesPage() {
   );
 }
 
-function CreateMatchForm({ tables, members, onSubmit }: any) {
+function CreateMatchForm({ tables, users, onSubmit }: any) {
   const [tableId, setTableId] = useState('');
   const [gameType, setGameType] = useState('snooker');
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>(['', '']);
@@ -316,12 +312,10 @@ function CreateMatchForm({ tables, members, onSubmit }: any) {
     e.preventDefault();
     const players = selectedPlayers
       .filter((id) => id)
-      .map((id, index) => {
-        const member = members.find((m: any) => m.id === id);
-        return member
-          ? { memberId: id, seatNumber: index + 1 }
-          : { playerId: id, seatNumber: index + 1 };
-      });
+      .map((id, index) => ({
+        playerId: id,
+        seatNumber: index + 1,
+      }));
 
     onSubmit({ tableId, gameType, players });
   };
@@ -361,9 +355,9 @@ function CreateMatchForm({ tables, members, onSubmit }: any) {
             }}
           >
             <MenuItem value="">Select Player</MenuItem>
-            {members.map((member: any) => (
-              <MenuItem key={member.id} value={member.id}>
-                {member.name} ({member.memberNumber})
+            {users.map((user: any) => (
+              <MenuItem key={user.id} value={user.id}>
+                {user.name} ({user.username})
               </MenuItem>
             ))}
           </Select>
@@ -392,9 +386,8 @@ function UpdateScoreForm({ match, onSubmit }: any) {
   const [scores, setScores] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
     match.players.forEach((p: any) => {
-      const playerId = p.playerId || p.memberId;
-      if (playerId) {
-        initial[playerId] = p.score;
+      if (p.playerId) {
+        initial[p.playerId] = p.score;
       }
     });
     return initial;
@@ -408,8 +401,8 @@ function UpdateScoreForm({ match, onSubmit }: any) {
   return (
     <form onSubmit={handleSubmit}>
       {match.players.map((player: any) => {
-        const playerId = player.playerId || player.memberId;
-        const playerName = player.player?.name || player.member?.name || 'Unknown';
+        const playerId = player.playerId;
+        const playerName = player.player?.name || 'Unknown';
         return (
           <TextField
             key={player.id}

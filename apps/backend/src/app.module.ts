@@ -14,8 +14,6 @@ import { SyncModule } from './sync/sync.module';
 import { ReportsModule } from './reports/reports.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { WebSocketModule } from './websocket/websocket.module';
-import { MembersModule } from './members/members.module';
-import { CreditsModule } from './credits/credits.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { TableMaintenanceModule } from './table-maintenance/table-maintenance.module';
@@ -41,8 +39,6 @@ import { TournamentsModule } from './tournaments/tournaments.module';
     ReportsModule,
     ActivityLogsModule,
     WebSocketModule,
-    MembersModule,
-    CreditsModule,
     ExpensesModule,
     BookingsModule,
     TableMaintenanceModule,

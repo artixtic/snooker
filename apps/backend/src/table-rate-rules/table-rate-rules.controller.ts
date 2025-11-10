@@ -35,12 +35,10 @@ export class TableRateRulesController {
   @Get('applicable')
   getApplicableRate(
     @Query('tableId') tableId: string,
-    @Query('memberType') memberType?: string,
     @Query('dateTime') dateTime?: string,
   ) {
     return this.rateRulesService.getApplicableRate(
       tableId,
-      memberType,
       dateTime ? new Date(dateTime) : undefined,
     );
   }

@@ -47,7 +47,6 @@ export class BookingsService {
       },
       include: {
         table: true,
-        member: true,
       },
     });
   }
@@ -69,7 +68,6 @@ export class BookingsService {
       where,
       include: {
         table: true,
-        member: true,
       },
       orderBy: { startTime: 'asc' },
     });
@@ -80,7 +78,6 @@ export class BookingsService {
       where: { id },
       include: {
         table: true,
-        member: true,
       },
     });
 
@@ -103,7 +100,6 @@ export class BookingsService {
       },
       include: {
         table: true,
-        member: true,
       },
     });
   }
@@ -137,7 +133,6 @@ export class BookingsService {
         data: {
           status: 'OCCUPIED',
           startedAt: new Date(),
-          memberId: booking.memberId,
         },
       });
     }

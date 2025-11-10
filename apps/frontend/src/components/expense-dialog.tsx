@@ -128,7 +128,7 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
                         <TableRow key={expense.id}>
                           <TableCell>{index + 1}</TableCell>
                           <TableCell>{expense.description}</TableCell>
-                          <TableCell>Rs. {Number(expense.amount).toFixed(2)}</TableCell>
+                          <TableCell>PKR {Number(expense.amount).toFixed(2)}</TableCell>
                           <TableCell>
                             {new Date(expense.date).toLocaleDateString()}
                           </TableCell>

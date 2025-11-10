@@ -27,6 +27,27 @@ export class ReportsService {
       },
     });
 
+    // Calculate canteen sales (from sale items) and snooker sales (table charges)
+    let canteenTotal = 0;
+    let snookerTotal = 0;
+    
+    sales.forEach((sale) => {
+      // Calculate canteen total from items (subtotal + tax for each item)
+      const saleCanteenTotal = sale.items.reduce(
+        (sum, item) => sum + Number(item.subtotal) + Number(item.tax || 0),
+        0
+      );
+      canteenTotal += saleCanteenTotal;
+      
+      // Snooker total is the table charge portion (sale subtotal minus canteen items subtotal before tax)
+      const canteenItemsSubtotal = sale.items.reduce(
+        (sum, item) => sum + Number(item.subtotal),
+        0
+      );
+      const tableCharge = Number(sale.subtotal) - canteenItemsSubtotal;
+      snookerTotal += tableCharge;
+    });
+    
     const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const totalCash = sales
       .filter((s) => s.paymentMethod === 'CASH' || s.paymentMethod === 'MIXED')
@@ -65,9 +86,23 @@ export class ReportsService {
       },
     });
 
+    // Calculate expenses for the day
+    const expenses = await this.prisma.expense.findMany({
+      where: {
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+    const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+
     return {
       date: date.toISOString().split('T')[0],
       totalSales,
+      snookerTotal,
+      canteenTotal,
+      totalExpenses,
       totalCash,
       totalCard,
       saleCount: sales.length,

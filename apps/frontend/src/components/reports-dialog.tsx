@@ -35,11 +35,11 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     enabled: open,
   });
 
-  // Calculate totals from sales
-  const snookerTotal = report?.totalSales || 0;
-  const canteenTotal = 0; // Would come from canteen sales
-  const total = snookerTotal + canteenTotal;
-  const expense = 0; // Would come from expenses
+  // Get totals from report
+  const snookerTotal = report?.snookerTotal || 0;
+  const canteenTotal = report?.canteenTotal || 0;
+  const total = (report?.totalSales || 0);
+  const expense = report?.totalExpenses || 0;
   const profit = total - expense;
 
   return (

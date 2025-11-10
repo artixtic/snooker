@@ -99,27 +99,8 @@ async function main() {
     tables.push(table);
   }
 
-  // Create sample members
-  const members = [];
-  for (let i = 1; i <= 5; i++) {
-    const member = await prisma.member.upsert({
-      where: { memberNumber: `MEM-${String(i).padStart(3, '0')}` },
-      update: {},
-      create: {
-        memberNumber: `MEM-${String(i).padStart(3, '0')}`,
-        name: `Member ${i}`,
-        phone: `0300${i}000000`,
-        email: `member${i}@example.com`,
-        memberType: i <= 2 ? 'VIP' : 'REGULAR',
-        creditLimit: 1000.0,
-        balance: 0,
-      },
-    });
-    members.push(member);
-  }
-
   // Create sample matches
-  if (tables.length >= 2 && members.length >= 2) {
+  if (tables.length >= 2) {
     // Create a finished match
     const finishedMatch = await prisma.match.create({
       data: {
@@ -129,20 +110,20 @@ async function main() {
         startTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
         endTime: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
         score: {
-          [members[0].id]: 45,
-          [members[1].id]: 32,
+          [admin.id]: 45,
+          [employee.id]: 32,
         },
         isPaid: true,
         players: {
           create: [
             {
-              memberId: members[0].id,
+              playerId: admin.id,
               seatNumber: 1,
               score: 45,
               result: 'win',
             },
             {
-              memberId: members[1].id,
+              playerId: employee.id,
               seatNumber: 2,
               score: 32,
               result: 'loss',
@@ -152,17 +133,17 @@ async function main() {
       },
     });
 
-    // Update member stats
-    await prisma.member.update({
-      where: { id: members[0].id },
+    // Update user stats
+    await prisma.user.update({
+      where: { id: admin.id },
       data: {
         totalMatches: 1,
         wins: 1,
         losses: 0,
       },
     });
-    await prisma.member.update({
-      where: { id: members[1].id },
+    await prisma.user.update({
+      where: { id: employee.id },
       data: {
         totalMatches: 1,
         wins: 0,
@@ -178,19 +159,19 @@ async function main() {
         gameType: 'pool',
         startTime: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
         score: {
-          [members[2].id]: 5,
-          [members[3].id]: 3,
+          [admin.id]: 5,
+          [employee.id]: 3,
         },
         isPaid: false,
         players: {
           create: [
             {
-              memberId: members[2].id,
+              playerId: admin.id,
               seatNumber: 1,
               score: 5,
             },
             {
-              memberId: members[3].id,
+              playerId: employee.id,
               seatNumber: 2,
               score: 3,
             },
@@ -224,23 +205,13 @@ async function main() {
         participants: {
           create: [
             {
-              memberId: members[0].id,
+              playerId: admin.id,
               seed: 1,
               status: 'registered',
             },
             {
-              memberId: members[1].id,
+              playerId: employee.id,
               seed: 2,
-              status: 'registered',
-            },
-            {
-              memberId: members[2].id,
-              seed: 3,
-              status: 'registered',
-            },
-            {
-              memberId: members[3].id,
-              seed: 4,
               status: 'registered',
             },
           ],

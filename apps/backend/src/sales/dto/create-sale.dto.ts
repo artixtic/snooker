@@ -43,10 +43,6 @@ export class CreateSaleDto {
   @IsString()
   tableId?: string;
 
-  @IsOptional()
-  @IsString()
-  memberId?: string;
-
   @IsNumber()
   subtotal: number;
 
@@ -54,8 +50,9 @@ export class CreateSaleDto {
   @IsNumber()
   discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  tax: number;
+  tax?: number;
 
   @IsNumber()
   total: number;

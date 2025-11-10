@@ -68,7 +68,6 @@ export class TableRateRulesService {
 
   async getApplicableRate(
     tableId: string,
-    memberType?: string,
     dateTime?: Date,
   ): Promise<number> {
     const now = dateTime || new Date();
@@ -103,14 +102,6 @@ export class TableRateRulesService {
         }
       }
 
-      // Check member discount rules
-      if (rule.ruleType === 'MEMBER_DISCOUNT') {
-        if (rule.memberType && memberType) {
-          applicable = applicable && rule.memberType === memberType;
-        } else {
-          applicable = false;
-        }
-      }
 
       if (applicable) {
         return Number(rule.ratePerHour);
