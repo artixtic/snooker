@@ -36,6 +36,35 @@ export function TableHistoryDialog({ open, onClose, table }: TableHistoryDialogP
   const [canteenDialogOpen, setCanteenDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
 
+  // Fetch games and tables to get game name and relative table number
+  const { data: games = [] } = useQuery({
+    queryKey: ['games'],
+    queryFn: async () => {
+      const response = await api.get('/games');
+      return response.data;
+    },
+    enabled: open && !!table,
+  });
+
+  const { data: tables = [] } = useQuery({
+    queryKey: ['tables'],
+    queryFn: async () => {
+      const response = await api.get('/tables');
+      return response.data;
+    },
+    enabled: open && !!table,
+  });
+
+  // Calculate game name and relative table number
+  const getTableDisplayName = () => {
+    if (!table) return 'N/A';
+    const tableGame = games.find((g: any) => g.id === table.gameId);
+    const gameTables = tables.filter((t: any) => t.gameId === table.gameId);
+    const gameTableNumber = gameTables.findIndex((t: any) => t.id === table.id) + 1;
+    const gameName = tableGame?.name || 'Table';
+    return `${gameName} ${gameTableNumber}`;
+  };
+
   const { data: sales = [] } = useQuery({
     queryKey: ['table-sales', table?.id],
     queryFn: async () => {
@@ -125,7 +154,7 @@ export function TableHistoryDialog({ open, onClose, table }: TableHistoryDialogP
           py: 2,
         }}
       >
-        📜 Table History - Snooker {table?.tableNumber}
+        📜 Table History - {getTableDisplayName()}
       </DialogTitle>
       <DialogContent sx={{ maxHeight: '70vh', overflow: 'auto', pt: 3 }}>
         <Box 
@@ -466,7 +495,7 @@ export function TableHistoryDialog({ open, onClose, table }: TableHistoryDialogP
                   📅 Date: {new Date(selectedSale.createdAt).toLocaleString()}
                 </Typography>
                 <Typography variant="body1" fontWeight="bold" sx={{ mb: 1, color: '#667eea' }}>
-                  🎱 Table: Snooker {table?.tableNumber}
+                  🎱 Table: {getTableDisplayName()}
                 </Typography>
                 {selectedSale.employee && (
                   <Typography variant="body1" fontWeight="bold" sx={{ color: '#667eea' }}>
@@ -488,7 +517,7 @@ export function TableHistoryDialog({ open, onClose, table }: TableHistoryDialogP
                     }}
                   >
                     <Typography variant="h6" gutterBottom sx={{ color: '#667eea', fontWeight: 'bold', mb: 2 }}>
-                      🎱 Snooker Table
+                      🎱 {getTableDisplayName()}
                     </Typography>
                     <Box display="flex" flexDirection="column" gap={1}>
                       {selectedSale.table.startedAt && (

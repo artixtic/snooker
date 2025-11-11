@@ -45,6 +45,25 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     refetchOnWindowFocus: false,
   });
 
+  // Get all tables to check for active ones
+  const { data: tables, refetch: refetchTables } = useQuery({
+    queryKey: ['tables'],
+    queryFn: async () => {
+      const response = await api.get('/tables');
+      return response.data;
+    },
+    enabled: open,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+
+  // Refetch tables when dialog opens
+  useEffect(() => {
+    if (open) {
+      refetchTables();
+    }
+  }, [open, refetchTables]);
+
   // Refetch shifts when dialog opens
   useEffect(() => {
     if (open) {
@@ -53,6 +72,11 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   }, [open, refetchShifts]);
 
   const activeShift = shifts?.find((shift: any) => shift.status === 'ACTIVE');
+
+  // Check for active tables (OCCUPIED or PAUSED)
+  const activeTables = tables?.filter((table: any) => 
+    table.status === 'OCCUPIED' || table.status === 'PAUSED'
+  ) || [];
 
   // Get shift report for active shift - always refetch fresh data
   const { data: report, refetch: refetchReport } = useQuery({
@@ -82,8 +106,9 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     if (closingDialogOpen && activeShift) {
       // Refetch fresh data when closing dialog opens
       refetchReport();
+      refetchTables(); // Also refetch tables to ensure we have latest status
     }
-  }, [closingDialogOpen, activeShift, refetchReport]);
+  }, [closingDialogOpen, activeShift, refetchReport, refetchTables]);
 
   const closeShiftMutation = useMutation({
     mutationFn: async (data: { closingCash: number; notes?: string }) => {
@@ -96,6 +121,7 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-report'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       setClosingDialogOpen(false);
       setClosingCash('');
       setNotes('');
@@ -108,9 +134,10 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   });
 
   // Get totals from report
+  const gameTotals = report?.gameTotals || [];
   const snookerTotal = report?.snookerTotal || 0;
   const canteenTotal = report?.canteenTotal || 0;
-  const total = (report?.totalSales || 0);
+  const total = (report?.salesTotal || 0);
   const expense = report?.totalExpenses || 0;
   const profit = total - expense;
 
@@ -119,6 +146,14 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       alert('No active shift found. Please start a shift first.');
       return;
     }
+    
+    // Check for active tables before opening closing dialog
+    if (activeTables.length > 0) {
+      const tableNumbers = activeTables.map((t: any) => t.tableNumber).join(', ');
+      alert(`⚠️ Cannot close shift! There are ${activeTables.length} active table(s): Table ${tableNumbers}.\n\nPlease close all tables before closing the shift.`);
+      return;
+    }
+    
     setClosingDialogOpen(true);
   };
 
@@ -127,6 +162,15 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       alert('Please enter a valid closing cash amount');
       return;
     }
+    
+    // Double-check for active tables before confirming close
+    if (activeTables.length > 0) {
+      const tableNumbers = activeTables.map((t: any) => t.tableNumber).join(', ');
+      alert(`⚠️ Cannot close shift! There are ${activeTables.length} active table(s): Table ${tableNumbers}.\n\nPlease close all tables before closing the shift.`);
+      setClosingDialogOpen(false);
+      return;
+    }
+    
     closeShiftMutation.mutate({
       closingCash: Number(closingCash),
       notes: notes || undefined,
@@ -162,6 +206,18 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
         {!activeShift && (
           <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
             No active shift found. Please start a shift to view the closing report.
+          </Alert>
+        )}
+        {activeTables.length > 0 && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+            <Typography variant="body2" fontWeight="bold">
+              ⚠️ Active Tables Detected!
+            </Typography>
+            <Typography variant="body2">
+              There are {activeTables.length} active table(s): Table {activeTables.map((t: any) => t.tableNumber).join(', ')}.
+              <br />
+              Please close all tables before closing the shift.
+            </Typography>
           </Alert>
         )}
         {activeShift && report && (
@@ -202,12 +258,25 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
               </TableRow>
             </TableHead>
             <TableBody>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'medium' }}>🎱 Snooker/Billard</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
-                  PKR {Math.ceil(snookerTotal)}
-                </TableCell>
-              </TableRow>
+              {/* Display each game's totals */}
+              {gameTotals.map((game: any) => (
+                <TableRow key={game.gameName}>
+                  <TableCell sx={{ fontWeight: 'medium' }}>
+                    🎮 {game.gameName} ({game.tableSessions} session{game.tableSessions !== 1 ? 's' : ''})
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                    PKR {Math.ceil(game.total)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {gameTotals.length === 0 && (
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'medium' }}>🎱 Games Total</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                    PKR {Math.ceil(snookerTotal)}
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell sx={{ fontWeight: 'medium' }}>🛒 Canteen</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
@@ -241,7 +310,7 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
           onClick={handleCloseDay} 
           variant="contained" 
           color="error"
-          disabled={!activeShift || closeShiftMutation.isPending}
+          disabled={!activeShift || closeShiftMutation.isPending || activeTables.length > 0}
           sx={{
             borderRadius: 2,
             px: 4,

@@ -84,28 +84,72 @@ async function main() {
     });
   }
 
-  // Create table sessions (2 tables, all AVAILABLE)
-  const tables = [];
-  for (let i = 1; i <= 2; i++) {
-    const table = await prisma.tableSession.upsert({
-      where: { tableNumber: i },
-      update: {
-        status: 'AVAILABLE',
-        startedAt: null,
-        endedAt: null,
-        pausedAt: null,
-        totalPausedMs: 0,
-        lastResumedAt: null,
-        currentCharge: 0,
-      },
-      create: {
-        tableNumber: i,
-        status: 'AVAILABLE',
-        ratePerHour: 8.0, // Default rate per minute (stored as ratePerHour but used as per minute)
-      },
+  // Create games
+  const games = [
+    {
+      name: 'Snooker',
+      description: 'Snooker tables',
+      rateType: 'PER_MINUTE' as const,
+      defaultRate: 8.0,
+    },
+    {
+      name: 'Table Tennis',
+      description: 'Table Tennis tables',
+      rateType: 'PER_MINUTE' as const,
+      defaultRate: 6.0,
+    },
+    {
+      name: 'PlayStation',
+      description: 'PlayStation gaming stations',
+      rateType: 'PER_HOUR' as const,
+      defaultRate: 200.0,
+    },
+    {
+      name: 'Foosball',
+      description: 'Foosball tables',
+      rateType: 'PER_MINUTE' as const,
+      defaultRate: 5.0,
+    },
+  ];
+
+  const createdGames = [];
+  for (const gameData of games) {
+    const game = await prisma.game.upsert({
+      where: { name: gameData.name },
+      update: {},
+      create: gameData,
     });
-    tables.push(table);
-    console.log(`Created table ${i} (AVAILABLE)`);
+    createdGames.push(game);
+    console.log(`Created game: ${game.name}`);
+  }
+
+  // Create table sessions (2 tables per game, all AVAILABLE)
+  let tableNumber = 1;
+  for (const game of createdGames) {
+    for (let i = 1; i <= 2; i++) {
+      const table = await prisma.tableSession.upsert({
+        where: { tableNumber },
+        update: {
+          status: 'AVAILABLE',
+          startedAt: null,
+          endedAt: null,
+          pausedAt: null,
+          totalPausedMs: 0,
+          lastResumedAt: null,
+          currentCharge: 0,
+          gameId: game.id,
+          ratePerHour: game.defaultRate,
+        },
+        create: {
+          tableNumber,
+          gameId: game.id,
+          status: 'AVAILABLE',
+          ratePerHour: game.defaultRate,
+        },
+      });
+      console.log(`Created table ${tableNumber} (${game.name}) - AVAILABLE`);
+      tableNumber++;
+    }
   }
 
   console.log('Seeding completed!');

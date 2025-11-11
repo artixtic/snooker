@@ -2,6 +2,13 @@
 
 ## ✅ Completed
 
+### Game Management
+- [x] Create, read, update, delete games
+- [x] Game rate types: Per Minute or Per Hour
+- [x] Default rate per game
+- [x] Game activation/deactivation
+- [x] Validation: Cannot delete games with linked tables
+
 ### Core POS Functionality
 - [x] Product catalog with search (by name, SKU, barcode)
 - [x] Shopping cart with quantity management
@@ -14,9 +21,11 @@
 - [x] Add/remove products
 - [x] Quantity adjustment
 - [x] Real-time total calculation
-- [x] Tax calculation (15% configurable)
+- [x] Optional tax calculation (15%, can be toggled on/off)
+- [x] Tax applies to both table charges and canteen items
 - [x] Discount support (per-item and global)
 - [x] Cart persistence (localStorage)
+- [x] Stock validation during checkout
 
 ### Admin Panel
 - [x] Dashboard with daily sales summary
@@ -51,16 +60,24 @@
 ## 🚧 In Progress / Next Steps
 
 ### Table Management
-- [ ] Table timer UI with live countdown
-- [ ] Start/stop table sessions from POS
-- [ ] Per-hour billing calculation display
-- [ ] Table status indicators
+- [x] Game management (CRUD operations)
+- [x] Tables linked to games (required relationship)
+- [x] Table timer UI with live countdown
+- [x] Start/stop table sessions from POS
+- [x] Per-minute or per-hour billing based on game type
+- [x] Table status indicators (Available, Occupied, Paused)
+- [x] Table creation with game assignment
+- [x] Table deletion (individual and bulk)
+- [x] Game-based table grouping in dashboard
+- [x] Table names show game name with relative numbering
 
 ### Shift Management
-- [ ] Shift start/end UI
-- [ ] Cash drawer reconciliation
-- [ ] Shift summary report
-- [ ] Cash discrepancy alerts
+- [x] Shift start/end UI
+- [x] Cash drawer reconciliation
+- [x] Shift summary report with game-based breakdown
+- [x] Cash discrepancy alerts
+- [x] Validation to prevent closing shift with active tables
+- [x] Game-specific revenue tracking in reports
 
 ### Advanced Features
 - [ ] Barcode scanning (USB scanner + camera)

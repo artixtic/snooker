@@ -20,10 +20,11 @@ snooker-pos/
 │   │   │   ├── products/     # Product CRUD
 │   │   │   ├── sales/        # Sale creation (append-only)
 │   │   │   ├── inventory/    # Stock movements
-│   │   │   ├── tables/       # Table sessions
+│   │   │   ├── games/        # Game management (CRUD)
+│   │   │   ├── tables/       # Table sessions (linked to games)
 │   │   │   ├── shifts/       # Shift management
 │   │   │   ├── sync/         # Offline sync (push/pull)
-│   │   │   ├── reports/      # Daily reports
+│   │   │   ├── reports/      # Daily reports (game-based)
 │   │   │   ├── activity-logs/# Audit logs
 │   │   │   ├── websocket/    # Real-time updates
 │   │   │   └── prisma/       # Prisma service
@@ -62,7 +63,9 @@ snooker-pos/
 ### Backend
 
 - **Prisma Schema**: `apps/backend/prisma/schema.prisma`
-  - Models: User, Product, Sale, SaleItem, TableSession, Shift, InventoryMovement, SyncLog, ActivityLog
+  - Models: User, Product, Sale, SaleItem, Game, TableSession, Shift, InventoryMovement, SyncLog, ActivityLog
+  - Games have rate types (PER_MINUTE, PER_HOUR) and default rates
+  - Tables are required to be linked to a game
 
 - **Sync Service**: `apps/backend/src/sync/sync.service.ts`
   - Handles push/pull operations

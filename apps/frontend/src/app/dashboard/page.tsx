@@ -27,6 +27,9 @@ import {
   Checkbox,
   Collapse,
   Alert,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Add,
@@ -50,6 +53,7 @@ import { ExpenseDialog } from '@/components/expense-dialog';
 import { ReportsDialog } from '@/components/reports-dialog';
 import { CustomReportsDialog } from '@/components/custom-reports-dialog';
 import { ShiftModal } from '@/components/shift-modal';
+import { GamesDialog } from '@/components/games-dialog';
 
 interface Table {
   id: string;
@@ -83,7 +87,9 @@ export default function DashboardPage() {
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [createTableDialogOpen, setCreateTableDialogOpen] = useState(false);
   const [deleteAllTablesDialogOpen, setDeleteAllTablesDialogOpen] = useState(false);
+  const [gamesDialogOpen, setGamesDialogOpen] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState(1);
+  const [selectedGameId, setSelectedGameId] = useState<string>('');
   const [ratePerMinute, setRatePerMinute] = useState(8); // Default rate: 8 PKR/min
   const [addonsAnchor, setAddonsAnchor] = useState<null | HTMLElement>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -92,7 +98,17 @@ export default function DashboardPage() {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({}); // Track expanded cards
   const queryClient = useQueryClient();
 
-  const { data: tables = [], isLoading } = useQuery({
+  // Fetch games
+  const { data: games = [], isLoading: gamesLoading } = useQuery({
+    queryKey: ['games'],
+    queryFn: async () => {
+      const response = await api.get('/games');
+      return response.data;
+    },
+  });
+
+  // Fetch tables
+  const { data: tables = [], isLoading: tablesLoading } = useQuery({
     queryKey: ['tables'],
     queryFn: async () => {
       const response = await api.get('/tables');
@@ -100,6 +116,14 @@ export default function DashboardPage() {
     },
     refetchInterval: 5000, // Refetch every 5 seconds for data sync
   });
+
+  const isLoading = gamesLoading || tablesLoading;
+
+  // Group tables by game
+  const tablesByGame = games.reduce((acc: Record<string, any[]>, game: any) => {
+    acc[game.id] = tables.filter((table: any) => table.gameId === game.id);
+    return acc;
+  }, {});
 
   // Check for active shift
   const { data: shifts } = useQuery({
@@ -237,14 +261,15 @@ export default function DashboardPage() {
   });
 
   const createTableMutation = useMutation({
-    mutationFn: async ({ tableNumber }: { tableNumber: number }) => {
-      const response = await api.post('/tables', { tableNumber });
+    mutationFn: async ({ tableNumber, gameId }: { tableNumber: number; gameId?: string }) => {
+      const response = await api.post('/tables', { tableNumber, gameId: gameId || undefined });
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       setCreateTableDialogOpen(false);
       setNewTableNumber(1);
+      setSelectedGameId('');
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create table';
@@ -346,15 +371,29 @@ export default function DashboardPage() {
     }
     
     // When occupied, calculate charge based on active time
-    // ratePerHour is actually stored as per minute
+    // Use game's rate type to determine if rate is per minute or per hour
     const start = new Date(table.startedAt).getTime();
     const now = currentTime; // Use client-side currentTime for smooth updates
     const totalElapsed = now - start;
     const totalPausedMs = table.totalPausedMs || 0;
     const activeTime = totalElapsed - totalPausedMs;
-    const minutes = activeTime / 60000;
-    const ratePerMinute = Number(table.ratePerHour); // Actually per minute, not per hour
-    return minutes * ratePerMinute;
+    
+    // Get rate type from game, default to PER_MINUTE
+    const rateType = (table as any).game?.rateType || 'PER_MINUTE';
+    const rate = Number(table.ratePerHour);
+    
+    let charge = 0;
+    if (rateType === 'PER_HOUR') {
+      // Rate is per hour
+      const hours = activeTime / (1000 * 60 * 60);
+      charge = hours * rate;
+    } else {
+      // Rate is per minute (default)
+      const minutes = activeTime / 60000;
+      charge = minutes * rate;
+    }
+    
+    return Math.max(0, charge);
   };
 
   const formatTime = (date: string | null) => {
@@ -364,6 +403,439 @@ export default function DashboardPage() {
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  // Helper function to render table card
+  const renderTableCard = (table: Table, game: any, gameTableNumber: number) => {
+    const elapsedTime = calculateElapsedTime(table);
+    const currentCharge = Number(calculateCurrentCharge(table));
+    const isOccupied = table.status === 'OCCUPIED' || table.status === 'PAUSED';
+
+    // Get game name - use game parameter or fallback to table.game
+    const gameName = game?.name || (table as any).game?.name || 'Table';
+
+    // Different gradient colors for different table statuses
+    const getCardGradient = () => {
+      if (table.status === 'AVAILABLE') {
+        return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      } else if (table.status === 'OCCUPIED') {
+        return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+      } else if (table.status === 'PAUSED') {
+        return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+      }
+      return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    };
+
+    const isExpanded = expandedCards[table.id] || false;
+    const toggleExpand = () => {
+      setExpandedCards(prev => ({ ...prev, [table.id]: !prev[table.id] }));
+    };
+
+    // Get rate display based on game's rate type
+    const rateType = game?.rateType || (table as any).game?.rateType || 'PER_MINUTE';
+    const rateLabel = rateType === 'PER_HOUR' ? 'PKR/hour' : 'PKR/min';
+    const rateValue = table.ratePerHour ? Number(table.ratePerHour) : (game?.defaultRate || (table as any).game?.defaultRate || 8);
+
+    return (
+      <Grid item xs={12} sm={6} md={4} lg={3} key={table.id}>
+        <Card
+          sx={{
+            background: getCardGradient(),
+            color: 'white',
+            borderRadius: 3,
+            position: 'relative',
+            minHeight: isExpanded ? 'auto' : 180,
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-8px)',
+              boxShadow: '0 15px 50px rgba(0, 0, 0, 0.3)',
+            }
+          }}
+        >
+          <CardContent>
+            <Box 
+              display="flex" 
+              justifyContent="space-between" 
+              alignItems="center" 
+              mb={isExpanded ? 2 : (isOccupied ? 1 : 0)}
+              sx={{ cursor: 'pointer' }}
+              onClick={toggleExpand}
+            >
+              <Box>
+                <Typography variant="h5" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                  🎱 {gameName} {gameTableNumber}
+                </Typography>
+                {!isOccupied && (
+                  <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mt: 0.5 }}>
+                    ({rateValue} {rateLabel})
+                  </Typography>
+                )}
+              </Box>
+              <Box display="flex" alignItems="center" gap={1}>
+                {table.status === 'AVAILABLE' && (
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete ${gameName} ${gameTableNumber}?`)) {
+                        deleteTableMutation.mutate({ tableId: table.id });
+                      }
+                    }}
+                    sx={{ 
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      }
+                    }}
+                  >
+                    <Remove fontSize="small" />
+                  </IconButton>
+                )}
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpand();
+                  }}
+                  sx={{ 
+                    color: 'white',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    }
+                  }}
+                >
+                  {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                </IconButton>
+              </Box>
+            </Box>
+
+            {/* Show time and cost when collapsed and occupied */}
+            {!isExpanded && isOccupied && (
+              <Box 
+                sx={{ 
+                  mt: 1,
+                  p: 1.5, 
+                  borderRadius: 2, 
+                  bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(10px)',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpand();
+                }}
+              >
+                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                  <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    {elapsedTime}
+                  </Typography>
+                  {table.status === 'PAUSED' && (
+                    <Chip 
+                      label="PAUSED" 
+                      size="small" 
+                      sx={{ 
+                        fontSize: '0.65rem', 
+                        height: 20,
+                        fontWeight: 'bold',
+                        background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
+                        color: '#000',
+                        boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)',
+                      }}
+                    />
+                  )}
+                </Box>
+                <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  PKR {Math.ceil(currentCharge)}
+                </Typography>
+              </Box>
+            )}
+
+            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<History />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedTable(table);
+                  setHistoryDialogOpen(true);
+                }}
+                sx={{ 
+                  mb: 2, 
+                  background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #FFA500 30%, #FFD700 90%)',
+                    boxShadow: '0 6px 20px rgba(255, 215, 0, 0.6)',
+                  }
+                }}
+              >
+                View History
+              </Button>
+
+              {isOccupied && (
+              <>
+                <Box mb={2} sx={{ 
+                  p: 2, 
+                  borderRadius: 2, 
+                  bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  backdropFilter: 'blur(10px)',
+                }}>
+                  <Typography variant="body2" sx={{ opacity: 0.9, mb: 0.5 }}>
+                    {formatTime(table.startedAt)} →
+                  </Typography>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <Typography variant="h5" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                      {elapsedTime}
+                    </Typography>
+                    {table.status === 'PAUSED' && (
+                      <Chip 
+                        label="PAUSED" 
+                        size="small" 
+                        sx={{ 
+                          fontSize: '0.7rem', 
+                          height: 24,
+                          fontWeight: 'bold',
+                          background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
+                          color: '#000',
+                          boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)',
+                        }}
+                      />
+                    )}
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    PKR {Math.ceil(currentCharge)}
+                  </Typography>
+                  {table.status === 'PAUSED' && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.9 }}>
+                      ⏸️ Timer paused - not charging
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Pause/Resume Buttons */}
+                <Box display="flex" gap={1} mb={1}>
+                  {table.status === 'OCCUPIED' ? (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<Pause />}
+                      onClick={() => pauseTableMutation.mutate(table.id)}
+                      disabled={pauseTableMutation.isPending}
+                      fullWidth
+                      sx={{ 
+                        background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 15px rgba(255, 152, 0, 0.4)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #F57C00 30%, #FF9800 90%)',
+                          boxShadow: '0 6px 20px rgba(255, 152, 0, 0.6)',
+                        }
+                      }}
+                    >
+                      Pause
+                    </Button>
+                  ) : table.status === 'PAUSED' ? (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<PlayArrow />}
+                      onClick={() => resumeTableMutation.mutate(table.id)}
+                      disabled={resumeTableMutation.isPending}
+                      fullWidth
+                      sx={{ 
+                        background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                          boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                        }
+                      }}
+                    >
+                      Resume
+                    </Button>
+                  ) : null}
+                </Box>
+
+                <Box display="flex" gap={1} mb={1}>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={async () => {
+                      if (table.status === 'PAUSED') {
+                        setSelectedTable(table);
+                        setCheckoutDialogOpen(true);
+                      } else if (table.status === 'OCCUPIED') {
+                        // Pause first, then open checkout
+                        try {
+                          await pauseTableMutation.mutateAsync(table.id);
+                          // Wait for refetch to complete
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                          const updatedTables = await queryClient.fetchQuery({ queryKey: ['tables'] });
+                          const updatedTable = (updatedTables as Table[]).find((t: Table) => t.id === table.id);
+                          if (updatedTable && updatedTable.status === 'PAUSED') {
+                            setSelectedTable(updatedTable);
+                            setCheckoutDialogOpen(true);
+                          }
+                        } catch (error) {
+                          console.error('Failed to pause table:', error);
+                          alert('Failed to pause table. Please try again.');
+                        }
+                      }
+                    }}
+                    disabled={pauseTableMutation.isPending || table.status === 'AVAILABLE'}
+                    sx={{ 
+                      background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
+                        boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
+                      },
+                      '&:disabled': {
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        color: 'rgba(255, 255, 255, 0.5)',
+                      }
+                    }}
+                  >
+                    Check Out {table.status !== 'PAUSED' && table.status === 'OCCUPIED' && '(Will Pause First)'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => {
+                      if (confirm(`Reset ${gameName} ${gameTableNumber}? This will clear all data without creating a sale.`)) {
+                        resetTableMutation.mutate({ tableId: table.id });
+                      }
+                    }}
+                    sx={{ 
+                      minWidth: 80,
+                      background: 'linear-gradient(45deg, #9E9E9E 30%, #757575 90%)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 15px rgba(158, 158, 158, 0.4)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #757575 30%, #9E9E9E 90%)',
+                        boxShadow: '0 6px 20px rgba(158, 158, 158, 0.6)',
+                      }
+                    }}
+                  >
+                    Reset
+                  </Button>
+                </Box>
+
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={() => {
+                    setSelectedTable(table);
+                    setCanteenDialogOpen(true);
+                  }}
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 15px rgba(33, 150, 243, 0.4)',
+                    '&:hover': {
+                      background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
+                      boxShadow: '0 6px 20px rgba(33, 150, 243, 0.6)',
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </>
+              )}
+
+              {!isOccupied && (
+                <Button
+                  variant="contained"
+                  fullWidth
+                  startIcon={<CheckCircle />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!activeShift) {
+                      alert('⚠️ Please start a shift first before checking in a table!');
+                      return;
+                    }
+                    setSelectedTable(table);
+                    setRatePerMinute(rateValue); // Use game's default rate or table's rate
+                    setStartTableDialogOpen(true);
+                  }}
+                  disabled={!activeShift}
+                  sx={{ 
+                    mt: 4,
+                    background: activeShift 
+                      ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
+                      : 'rgba(0, 0, 0, 0.2)',
+                    color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
+                    fontWeight: 'bold',
+                    boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
+                    '&:hover': activeShift ? {
+                      background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                      boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                    } : {},
+                    '&:disabled': {
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                    }
+                  }}
+                  title={!activeShift ? 'Please start a shift first' : ''}
+                >
+                  {activeShift ? 'Check In' : '⚠️ Start Shift First'}
+                </Button>
+              )}
+            </Collapse>
+
+            {/* Show Check In button when collapsed and available */}
+            {!isExpanded && !isOccupied && (
+              <Button
+                variant="contained"
+                fullWidth
+                startIcon={<CheckCircle />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!activeShift) {
+                    alert('⚠️ Please start a shift first before checking in a table!');
+                    return;
+                  }
+                  setSelectedTable(table);
+                  setRatePerMinute(rateValue); // Use game's default rate or table's rate
+                  setStartTableDialogOpen(true);
+                }}
+                disabled={!activeShift}
+                sx={{ 
+                  mt: 2,
+                  background: activeShift 
+                    ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
+                    : 'rgba(0, 0, 0, 0.2)',
+                  color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
+                  fontWeight: 'bold',
+                  boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
+                  '&:hover': activeShift ? {
+                    background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                    boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                  } : {},
+                  '&:disabled': {
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                  }
+                }}
+                title={!activeShift ? 'Please start a shift first' : ''}
+              >
+                {activeShift ? 'Check In' : '⚠️ Start Shift First'}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </Grid>
+    );
   };
 
   if (isLoading) {
@@ -410,6 +882,26 @@ export default function DashboardPage() {
               Start Shift
             </Button>
           )}
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Add />}
+            onClick={() => setGamesDialogOpen(true)}
+            sx={{ 
+              mr: 1,
+              py: 0.5,
+              px: 1.5,
+              fontSize: '0.85rem',
+              background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
+              boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #7B1FA2 30%, #9C27B0 90%)',
+                boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
+              }
+            }}
+          >
+            Manage Games
+          </Button>
           <Button
             variant="contained"
             size="small"
@@ -599,432 +1091,61 @@ export default function DashboardPage() {
       </Menu>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Grid container spacing={3}>
-          {tables.map((table: Table) => {
-            const elapsedTime = calculateElapsedTime(table);
-            const currentCharge = Number(calculateCurrentCharge(table));
-            const isOccupied = table.status === 'OCCUPIED' || table.status === 'PAUSED';
-
-            // Different gradient colors for different table statuses
-            const getCardGradient = () => {
-              if (table.status === 'AVAILABLE') {
-                return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-              } else if (table.status === 'OCCUPIED') {
-                return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-              } else if (table.status === 'PAUSED') {
-                return 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
-              }
-              return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            };
-
-            const isExpanded = expandedCards[table.id] || false;
-            const toggleExpand = () => {
-              setExpandedCards(prev => ({ ...prev, [table.id]: !prev[table.id] }));
-            };
-
-            return (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={table.id}>
-                <Card
-                  sx={{
-                    background: getCardGradient(),
-                    color: 'white',
-                    borderRadius: 3,
-                    position: 'relative',
-                    minHeight: isExpanded ? 'auto' : 180,
-                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 15px 50px rgba(0, 0, 0, 0.3)',
-                    }
-                  }}
-                >
-                  <CardContent>
-                    <Box 
-                      display="flex" 
-                      justifyContent="space-between" 
-                      alignItems="center" 
-                      mb={isExpanded ? 2 : (isOccupied ? 1 : 0)}
-                      sx={{ cursor: 'pointer' }}
-                      onClick={toggleExpand}
-                    >
-                      <Box>
-                        <Typography variant="h5" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-                          🎱 Snooker {table.tableNumber}
-                        </Typography>
-                        {!isOccupied && (
-                          <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500, mt: 0.5 }}>
-                            (PKR {Math.ceil(Number(table.ratePerHour))}/min)
-                          </Typography>
-                        )}
-                      </Box>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        {table.status === 'AVAILABLE' && (
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm(`Delete Snooker ${table.tableNumber}?`)) {
-                                deleteTableMutation.mutate({ tableId: table.id });
-                              }
-                            }}
-                            sx={{ 
-                              color: 'white',
-                              '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                              }
-                            }}
-                          >
-                            <Remove fontSize="small" />
-                          </IconButton>
-                        )}
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleExpand();
-                          }}
-                          sx={{ 
-                            color: 'white',
-                            '&:hover': {
-                              bgcolor: 'rgba(255, 255, 255, 0.2)',
-                            }
-                          }}
-                        >
-                          {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                        </IconButton>
-                      </Box>
-                    </Box>
-
-                    {/* Show time and cost when collapsed and occupied */}
-                    {!isExpanded && isOccupied && (
-                      <Box 
-                        sx={{ 
-                          mt: 1,
-                          p: 1.5, 
-                          borderRadius: 2, 
-                          bgcolor: 'rgba(255, 255, 255, 0.15)',
-                          backdropFilter: 'blur(10px)',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleExpand();
-                        }}
-                      >
-                        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                          <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                            {elapsedTime}
-                          </Typography>
-                          {table.status === 'PAUSED' && (
-                            <Chip 
-                              label="PAUSED" 
-                              size="small" 
-                              sx={{ 
-                                fontSize: '0.65rem', 
-                                height: 20,
-                                fontWeight: 'bold',
-                                background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
-                                color: '#000',
-                                boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)',
-                              }}
-                            />
-                          )}
-                        </Box>
-                        <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                          PKR {Math.ceil(currentCharge)}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<History />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTable(table);
-                          setHistoryDialogOpen(true);
-                        }}
-                        sx={{ 
-                          mb: 2, 
-                          background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
-                          color: '#000',
-                          fontWeight: 'bold',
-                          boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
-                          '&:hover': {
-                            background: 'linear-gradient(45deg, #FFA500 30%, #FFD700 90%)',
-                            boxShadow: '0 6px 20px rgba(255, 215, 0, 0.6)',
-                          }
-                        }}
-                      >
-                        View History
-                      </Button>
-
-                      {isOccupied && (
-                      <>
-                        <Box mb={2} sx={{ 
-                          p: 2, 
-                          borderRadius: 2, 
-                          bgcolor: 'rgba(255, 255, 255, 0.15)',
-                          backdropFilter: 'blur(10px)',
-                        }}>
-                          <Typography variant="body2" sx={{ opacity: 0.9, mb: 0.5 }}>
-                            {formatTime(table.startedAt)} →
-                          </Typography>
-                          <Box display="flex" alignItems="center" gap={1} mb={1}>
-                            <Typography variant="h5" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                              {elapsedTime}
-                            </Typography>
-                            {table.status === 'PAUSED' && (
-                              <Chip 
-                                label="PAUSED" 
-                                size="small" 
-                                sx={{ 
-                                  fontSize: '0.7rem', 
-                                  height: 24,
-                                  fontWeight: 'bold',
-                                  background: 'linear-gradient(45deg, #FFD700 30%, #FFA500 90%)',
-                                  color: '#000',
-                                  boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)',
-                                }}
-                              />
-                            )}
-                          </Box>
-                          <Typography variant="h6" fontWeight="bold" sx={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                            PKR {Math.ceil(currentCharge)}
-                          </Typography>
-                          {table.status === 'PAUSED' && (
-                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, opacity: 0.9 }}>
-                              ⏸️ Timer paused - not charging
-                            </Typography>
-                          )}
-                        </Box>
-
-                        {/* Pause/Resume Buttons */}
-                        <Box display="flex" gap={1} mb={1}>
-                          {table.status === 'OCCUPIED' ? (
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<Pause />}
-                              onClick={() => pauseTableMutation.mutate(table.id)}
-                              disabled={pauseTableMutation.isPending}
-                              fullWidth
-                              sx={{ 
-                                background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
-                                color: 'white',
-                                fontWeight: 'bold',
-                                boxShadow: '0 4px 15px rgba(255, 152, 0, 0.4)',
-                                '&:hover': {
-                                  background: 'linear-gradient(45deg, #F57C00 30%, #FF9800 90%)',
-                                  boxShadow: '0 6px 20px rgba(255, 152, 0, 0.6)',
-                                }
-                              }}
-                            >
-                              Pause
-                            </Button>
-                          ) : table.status === 'PAUSED' ? (
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<PlayArrow />}
-                              onClick={() => resumeTableMutation.mutate(table.id)}
-                              disabled={resumeTableMutation.isPending}
-                              fullWidth
-                              sx={{ 
-                                background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
-                                color: 'white',
-                                fontWeight: 'bold',
-                                boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-                                '&:hover': {
-                                  background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
-                                  boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-                                }
-                              }}
-                            >
-                              Resume
-                            </Button>
-                          ) : null}
-                        </Box>
-
-                        <Box display="flex" gap={1} mb={1}>
-                          <Button
-                            variant="contained"
-                            fullWidth
-                            onClick={async () => {
-                              if (table.status === 'PAUSED') {
-                                setSelectedTable(table);
-                                setCheckoutDialogOpen(true);
-                              } else if (table.status === 'OCCUPIED') {
-                                // Pause first, then open checkout
-                                try {
-                                  await pauseTableMutation.mutateAsync(table.id);
-                                  // Wait for refetch to complete
-                                  await new Promise(resolve => setTimeout(resolve, 500));
-                                  const updatedTables = await queryClient.fetchQuery({ queryKey: ['tables'] });
-                                  const updatedTable = (updatedTables as Table[]).find((t: Table) => t.id === table.id);
-                                  if (updatedTable && updatedTable.status === 'PAUSED') {
-                                    setSelectedTable(updatedTable);
-                                    setCheckoutDialogOpen(true);
-                                  }
-                                } catch (error) {
-                                  console.error('Failed to pause table:', error);
-                                  alert('Failed to pause table. Please try again.');
-                                }
-                              }
-                            }}
-                            disabled={pauseTableMutation.isPending || table.status === 'AVAILABLE'}
-                            sx={{ 
-                              background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-                              color: 'white',
-                              fontWeight: 'bold',
-                              boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
-                              '&:hover': {
-                                background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
-                                boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
-                              },
-                              '&:disabled': {
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                color: 'rgba(255, 255, 255, 0.5)',
-                              }
-                            }}
-                          >
-                            Check Out {table.status !== 'PAUSED' && table.status === 'OCCUPIED' && '(Will Pause First)'}
-                          </Button>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => {
-                              if (confirm(`Reset Snooker ${table.tableNumber}? This will clear all data without creating a sale.`)) {
-                                resetTableMutation.mutate({ tableId: table.id });
-                              }
-                            }}
-                            sx={{ 
-                              minWidth: 80,
-                              background: 'linear-gradient(45deg, #9E9E9E 30%, #757575 90%)',
-                              color: 'white',
-                              fontWeight: 'bold',
-                              boxShadow: '0 4px 15px rgba(158, 158, 158, 0.4)',
-                              '&:hover': {
-                                background: 'linear-gradient(45deg, #757575 30%, #9E9E9E 90%)',
-                                boxShadow: '0 6px 20px rgba(158, 158, 158, 0.6)',
-                              }
-                            }}
-                          >
-                            Reset
-                          </Button>
-                        </Box>
-
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          onClick={() => {
-                            setSelectedTable(table);
-                            setCanteenDialogOpen(true);
-                          }}
-                          sx={{ 
-                            background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
-                            color: 'white',
-                            fontWeight: 'bold',
-                            boxShadow: '0 4px 15px rgba(33, 150, 243, 0.4)',
-                            '&:hover': {
-                              background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
-                              boxShadow: '0 6px 20px rgba(33, 150, 243, 0.6)',
-                            }
-                          }}
-                        >
-                          Add
-                        </Button>
-                      </>
-                      )}
-
-                      {!isOccupied && (
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          startIcon={<CheckCircle />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!activeShift) {
-                              alert('⚠️ Please start a shift first before checking in a table!');
-                              return;
-                            }
-                            setSelectedTable(table);
-                            setRatePerMinute(8); // Reset to default
-                            setStartTableDialogOpen(true);
-                          }}
-                          disabled={!activeShift}
-                          sx={{ 
-                            mt: 4,
-                            background: activeShift 
-                              ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
-                              : 'rgba(0, 0, 0, 0.2)',
-                            color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
-                            fontWeight: 'bold',
-                            boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
-                            '&:hover': activeShift ? {
-                              background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
-                              boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-                            } : {},
-                            '&:disabled': {
-                              background: 'rgba(0, 0, 0, 0.2)',
-                              color: 'rgba(255, 255, 255, 0.5)',
-                            }
-                          }}
-                          title={!activeShift ? 'Please start a shift first' : ''}
-                        >
-                          {activeShift ? 'Check In' : '⚠️ Start Shift First'}
-                        </Button>
-                      )}
-                    </Collapse>
-
-                    {/* Show Check In button when collapsed and available */}
-                    {!isExpanded && !isOccupied && (
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        startIcon={<CheckCircle />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!activeShift) {
-                            alert('⚠️ Please start a shift first before checking in a table!');
-                            return;
-                          }
-                          setSelectedTable(table);
-                          setRatePerMinute(8);
-                          setStartTableDialogOpen(true);
-                        }}
-                        disabled={!activeShift}
-                        sx={{ 
-                          mt: 2,
-                          background: activeShift 
-                            ? 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)'
-                            : 'rgba(0, 0, 0, 0.2)',
-                          color: activeShift ? 'white' : 'rgba(255, 255, 255, 0.5)',
-                          fontWeight: 'bold',
-                          boxShadow: activeShift ? '0 4px 15px rgba(76, 175, 80, 0.4)' : 'none',
-                          '&:hover': activeShift ? {
-                            background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
-                            boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-                          } : {},
-                          '&:disabled': {
-                            background: 'rgba(0, 0, 0, 0.2)',
-                            color: 'rgba(255, 255, 255, 0.5)',
-                          }
-                        }}
-                        title={!activeShift ? 'Please start a shift first' : ''}
-                      >
-                        {activeShift ? 'Check In' : '⚠️ Start Shift First'}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
+        {/* Render games with their tables */}
+        {games.map((game: any) => {
+          const gameTables = tablesByGame[game.id] || [];
+          if (gameTables.length === 0) return null; // Don't show games with no tables
+          
+          return (
+            <Box key={`game-${game.id}`} sx={{ mb: 4 }}>
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 2.5,
+                  borderRadius: 3,
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
+                  border: '2px solid rgba(102, 126, 234, 0.4)',
+                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.2)',
+                }}
+              >
+                <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                  <Typography variant="h4" fontWeight="bold" sx={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}>
+                    🎮 {game.name}
+                  </Typography>
+                  <Chip 
+                    label={game.rateType === 'PER_HOUR' ? 'Per Hour' : 'Per Minute'} 
+                    size="small" 
+                    sx={{ 
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      background: game.rateType === 'PER_HOUR' 
+                        ? 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)'
+                        : 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                      color: 'white',
+                    }}
+                  />
+                  {game.description && (
+                    <Typography variant="body2" sx={{ opacity: 0.8, flex: 1 }}>
+                      {game.description}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <Grid container spacing={3}>
+                {gameTables.map((table: Table, index: number) => {
+                  return renderTableCard(table, game, index + 1);
+                })}
               </Grid>
-            );
-          })}
+            </Box>
+          );
+        })}
 
-          {/* Create Table Card */}
+        {/* Create Table Card - moved outside game sections */}
+        <Grid container spacing={3} sx={{ mt: 2 }}>
           <Grid item xs={12} sm={6} md={4} lg={3}>
             <Card
               sx={{
@@ -1064,6 +1185,8 @@ export default function DashboardPage() {
 
       {/* Checkout Dialog */}
       <CheckoutDialog
+        games={games}
+        tables={tables}
         open={checkoutDialogOpen}
         onClose={() => {
           setCheckoutDialogOpen(false);
@@ -1139,6 +1262,12 @@ export default function DashboardPage() {
         mode="start"
       />
 
+      {/* Games Dialog */}
+      <GamesDialog
+        open={gamesDialogOpen}
+        onClose={() => setGamesDialogOpen(false)}
+      />
+
       {/* Create Table Dialog */}
       <Dialog 
         open={createTableDialogOpen} 
@@ -1188,6 +1317,24 @@ export default function DashboardPage() {
               },
             }}
           />
+          <Box sx={{ mt: 2 }}>
+            <FormControl fullWidth required>
+              <InputLabel>Game *</InputLabel>
+              <Select
+                value={selectedGameId}
+                onChange={(e) => setSelectedGameId(e.target.value)}
+                label="Game *"
+                sx={{ borderRadius: 2 }}
+                required
+              >
+                {games.map((game: any) => (
+                  <MenuItem key={game.id} value={game.id}>
+                    {game.name} ({game.rateType === 'PER_HOUR' ? 'Per Hour' : 'Per Minute'})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
           <Button 
@@ -1207,11 +1354,12 @@ export default function DashboardPage() {
           <Button
             variant="contained"
             onClick={() => {
-              if (newTableNumber > 0) {
-                createTableMutation.mutate({ tableNumber: newTableNumber });
+              if (newTableNumber > 0 && selectedGameId) {
+                createTableMutation.mutate({ tableNumber: newTableNumber, gameId: selectedGameId });
+                setSelectedGameId(''); // Reset after creation
               }
             }}
-            disabled={createTableMutation.isPending || newTableNumber <= 0}
+            disabled={createTableMutation.isPending || newTableNumber <= 0 || !selectedGameId}
             sx={{
               borderRadius: 2,
               px: 4,
@@ -1334,7 +1482,14 @@ export default function DashboardPage() {
             py: 2,
           }}
         >
-          ✅ Check In - Snooker {selectedTable?.tableNumber || 'N/A'}
+          ✅ Check In - {(() => {
+            if (!selectedTable) return 'N/A';
+            const tableGame = games.find((g: any) => g.id === selectedTable.gameId);
+            const gameTables = tables.filter((t: any) => t.gameId === selectedTable.gameId);
+            const gameTableNumber = gameTables.findIndex((t: any) => t.id === selectedTable.id) + 1;
+            const gameName = tableGame?.name || 'Table';
+            return `${gameName} ${gameTableNumber}`;
+          })()}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           {!activeShift && (
@@ -1429,7 +1584,7 @@ export default function DashboardPage() {
 }
 
 // Checkout Dialog Component
-function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [] }: { open: boolean; onClose: () => void; table: Table | null; onCheckout: (amount: number, skipSale?: boolean, taxEnabled?: boolean) => void; cartItems?: CartItem[] }) {
+function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [], games = [], tables = [] }: { open: boolean; onClose: () => void; table: Table | null; onCheckout: (amount: number, skipSale?: boolean, taxEnabled?: boolean) => void; cartItems?: CartItem[]; games?: any[]; tables?: any[] }) {
   const [amount, setAmount] = useState(0);
   const [frozenCharge, setFrozenCharge] = useState(0);
   const [taxEnabled, setTaxEnabled] = useState(true); // Default to enabled
@@ -1499,7 +1654,14 @@ function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [] }: { 
           py: 2,
         }}
       >
-        🧾 Check Out - Snooker {table?.tableNumber || 'N/A'}
+        🧾 Check Out - {(() => {
+            if (!table) return 'N/A';
+            const tableGame = games.find((g: any) => g.id === table.gameId);
+            const gameTables = tables.filter((t: any) => t.gameId === table.gameId);
+            const gameTableNumber = gameTables.findIndex((t: any) => t.id === table.id) + 1;
+            const gameName = tableGame?.name || 'Table';
+            return `${gameName} ${gameTableNumber}`;
+          })()}
       </DialogTitle>
       <DialogContent sx={{ pt: 3 }}>
         <Box mb={2}>

@@ -89,6 +89,8 @@ This creates:
 - Admin user: `admin` / `admin123`
 - Employee user: `employee` / `employee123`
 - Sample products and categories
+- 4 games: Snooker, Table Tennis, PlayStation, Foosball
+- 2 tables per game (8 tables total), all in AVAILABLE status
 
 ### 6. Start Development
 
@@ -171,9 +173,10 @@ pnpm prisma generate
 ## 📱 Key Features
 
 ### POS Functionality
-- **Table Management**: Create/open/close tables with per-hour billing
-- **Timer System**: Real-time table usage tracking with configurable rates
-- **Cart System**: Add items, apply discounts, calculate taxes
+- **Game Management**: Create and manage games (Snooker, Table Tennis, PlayStation, Foosball, etc.)
+- **Table Management**: Create/open/close tables linked to games with per-minute or per-hour billing
+- **Timer System**: Real-time table usage tracking with game-specific rate types
+- **Cart System**: Add items, apply discounts, optional tax calculation (15%)
 - **Payment Processing**: Cash and card payments with change calculation
 - **Receipt Printing**: ESC/POS thermal printer support and PDF receipts
 
@@ -192,10 +195,13 @@ pnpm prisma generate
 ### Shift Management
 - **Shift Tracking**: Start/end shifts with employee assignment
 - **Cash Reconciliation**: Opening and closing cash tracking
-- **Shift Reports**: End-of-shift summaries and discrepancies
+- **Shift Reports**: End-of-shift summaries with game-based revenue breakdown
+- **Validation**: Prevents closing shift if tables are still active
 
 ### Reports & Analytics
-- **Daily Reports**: Sales summaries, table usage, top products
+- **Daily Reports**: Sales summaries grouped by games, table usage, top products
+- **Shift Closing Reports**: Game-based revenue breakdown with session counts
+- **Custom Reports**: Date range reports with game-specific analytics
 - **Export**: Excel (XLSX) and PDF formats
 - **Activity Logs**: Audit trail for all operations
 
@@ -280,18 +286,29 @@ pnpm test
 - `POST /sync/push` - Push local changes to server
 - `GET /sync/pull?since=ISO_DATE` - Pull server changes
 
+### Games
+
+- `GET /games` - List all games
+- `POST /games` - Create new game
+- `PATCH /games/:id` - Update game
+- `DELETE /games/:id` - Delete game (only if no tables linked)
+
 ### Tables
 
-- `GET /tables` - List all tables
-- `POST /tables/:id/start` - Start table session
+- `GET /tables` - List all tables (includes game information)
+- `POST /tables` - Create new table (requires gameId)
+- `POST /tables/:id/start` - Start table session (requires active shift)
 - `POST /tables/:id/stop` - Stop table session
+- `DELETE /tables/:id` - Delete table
+- `DELETE /tables` - Delete all tables
 - `GET /tables/active` - Get active tables
 
 ### Shifts
 
 - `POST /shifts/start` - Start shift
-- `POST /shifts/:id/close` - Close shift
+- `POST /shifts/:id/close` - Close shift (validates all tables are closed)
 - `GET /shifts` - List shifts
+- `GET /shifts/:id/report` - Get shift report with game-based breakdown
 
 ### Reports
 

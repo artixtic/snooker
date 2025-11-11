@@ -20,6 +20,11 @@ enum TableStatus {
   RESERVED
 }
 
+enum RateType {
+  PER_MINUTE
+  PER_HOUR
+}
+
 enum PaymentMethod {
   CASH
   CARD
@@ -200,28 +205,47 @@ model SaleItem {
   @@index([productId])
 }
 
+model Game {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?  @db.Text
+  rateType    RateType @default(PER_MINUTE)
+  defaultRate Decimal  @db.Decimal(10, 2) @default(8)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tables TableSession[]
+
+  @@map("games")
+}
+
 model TableSession {
   id             String      @id @default(cuid())
   tableNumber    Int         @unique
+  gameId         String
   status         TableStatus @default(AVAILABLE)
   startedAt      DateTime?
   endedAt        DateTime?
   pausedAt       DateTime?
   totalPausedMs  Int         @default(0) // Total paused time in milliseconds
   lastResumedAt  DateTime?   // When the table was last resumed
-  ratePerHour    Decimal     @db.Decimal(10, 2) @default(0)
+  ratePerHour    Decimal     @db.Decimal(10, 2) @default(0) // Stores the rate value (interpreted based on game's rateType)
   discount       Decimal?    @db.Decimal(10, 2)
   currentCharge  Decimal     @db.Decimal(10, 2) @default(0)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   // Relations
-  sales  Sale[]
-  bookings Booking[]
+  game            Game       @relation(fields: [gameId], references: [id])
+  sales           Sale[]
+  bookings        Booking[]
   maintenanceRecords TableMaintenance[]
-  matches Match[]
+  matches         Match[]
 
   @@map("tables")
+  @@index([gameId])
 }
 
 model Shift {

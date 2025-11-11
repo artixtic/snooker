@@ -10,6 +10,9 @@ export class TablesService {
 
   async findAll() {
     return this.prisma.tableSession.findMany({
+      include: {
+        game: true,
+      },
       orderBy: { tableNumber: 'asc' },
     });
   }
@@ -24,11 +27,23 @@ export class TablesService {
       throw new ConflictException(`Table ${createTableDto.tableNumber} already exists`);
     }
 
+    // Get the game to use its default rate
+    const game = await this.prisma.game.findUnique({
+      where: { id: createTableDto.gameId },
+    });
+
+    if (!game) {
+      throw new NotFoundException(`Game with ID ${createTableDto.gameId} not found`);
+    }
+
+    const defaultRate = Number(game.defaultRate);
+
     return this.prisma.tableSession.create({
       data: {
         tableNumber: createTableDto.tableNumber,
+        gameId: createTableDto.gameId,
         status: 'AVAILABLE',
-        ratePerHour: 8, // Default rate per minute
+        ratePerHour: defaultRate,
       },
     });
   }
@@ -68,6 +83,9 @@ export class TablesService {
   async findOne(id: string) {
     return this.prisma.tableSession.findUnique({
       where: { id },
+      include: {
+        game: true,
+      },
     });
   }
 
@@ -89,17 +107,32 @@ export class TablesService {
       throw new BadRequestException('No active shift found. Please start a shift before checking in a table.');
     }
 
+    // Get the rate - use provided rate, or table's current rate, or game's default rate, or fallback to 8
+    let rate = dto.ratePerHour;
+    if (!rate) {
+      rate = table.ratePerHour ? Number(table.ratePerHour) : undefined;
+    }
+    if (!rate && table.game) {
+      rate = Number(table.game.defaultRate);
+    }
+    if (!rate) {
+      rate = 8; // Final fallback
+    }
+
     return this.prisma.tableSession.update({
       where: { id: tableId },
       data: {
         status: 'OCCUPIED',
         startedAt: new Date(),
         lastResumedAt: new Date(),
-        ratePerHour: dto.ratePerHour || table.ratePerHour || 8, // Default to 8 PKR per minute (ratePerHour field stores per minute)
+        ratePerHour: rate,
         discount: dto.discount,
         totalPausedMs: 0, // Reset paused time
         pausedAt: null,
         currentCharge: 0,
+      },
+      include: {
+        game: true,
       },
     });
   }
@@ -120,14 +153,8 @@ export class TablesService {
       throw new Error('Table has no start time');
     }
 
-    // Calculate current charge at pause time (before adding pause duration)
-    // ratePerHour is actually stored as per minute
-    const startTime = table.startedAt.getTime();
-    const totalElapsedMs = now.getTime() - startTime;
-    const totalPausedMs = table.totalPausedMs || 0;
-    const activeTimeMs = totalElapsedMs - totalPausedMs;
-    const minutes = activeTimeMs / (1000 * 60);
-    const currentCharge = minutes * Number(table.ratePerHour);
+    // Calculate current charge at pause time using the game's rate type
+    const currentCharge = this.calculateCurrentCharge(table);
 
     // When pausing, we just set pausedAt. The pause duration will be added to totalPausedMs when resuming
     return this.prisma.tableSession.update({
@@ -228,6 +255,7 @@ export class TablesService {
 
   /**
    * Calculate current charge for an active table (excluding paused time)
+   * Uses game's rate type to determine if rate is per minute or per hour
    */
   calculateCurrentCharge(table: any): number {
     if (!table.startedAt || table.status === 'AVAILABLE') {
@@ -247,9 +275,21 @@ export class TablesService {
     
     const totalElapsedMs = now - startTime;
     const activeTimeMs = totalElapsedMs - totalPausedMs - currentPauseMs;
-    // ratePerHour is actually stored as per minute
-    const minutes = activeTimeMs / (1000 * 60);
-    const charge = minutes * Number(table.ratePerHour);
+    
+    // Get rate type from game, default to PER_MINUTE
+    const rateType = table.game?.rateType || 'PER_MINUTE';
+    const rate = Number(table.ratePerHour);
+    
+    let charge = 0;
+    if (rateType === 'PER_HOUR') {
+      // Rate is per hour
+      const hours = activeTimeMs / (1000 * 60 * 60);
+      charge = hours * rate;
+    } else {
+      // Rate is per minute (default)
+      const minutes = activeTimeMs / (1000 * 60);
+      charge = minutes * rate;
+    }
     
     return Math.max(0, charge);
   }

@@ -47,6 +47,35 @@ export function CanteenDialog({ open, onClose, table, items: initialItems = [], 
   const [items, setItems] = useState<CartItem[]>(initialItems);
   const queryClient = useQueryClient();
 
+  // Fetch games and tables to get game name and relative table number
+  const { data: games = [] } = useQuery({
+    queryKey: ['games'],
+    queryFn: async () => {
+      const response = await api.get('/games');
+      return response.data;
+    },
+    enabled: open && !!table,
+  });
+
+  const { data: tables = [] } = useQuery({
+    queryKey: ['tables'],
+    queryFn: async () => {
+      const response = await api.get('/tables');
+      return response.data;
+    },
+    enabled: open && !!table,
+  });
+
+  // Calculate game name and relative table number
+  const getTableDisplayName = () => {
+    if (!table) return 'N/A';
+    const tableGame = games.find((g: any) => g.id === table.gameId);
+    const gameTables = tables.filter((t: any) => t.gameId === table.gameId);
+    const gameTableNumber = gameTables.findIndex((t: any) => t.id === table.id) + 1;
+    const gameName = tableGame?.name || 'Table';
+    return `${gameName} ${gameTableNumber}`;
+  };
+
   // Sync items when initialItems change (when dialog opens with existing items)
   useEffect(() => {
     if (open) {
@@ -146,7 +175,7 @@ export function CanteenDialog({ open, onClose, table, items: initialItems = [], 
           py: 2,
         }}
       >
-        🛒 Canteen - Snooker {table?.tableNumber || 'N/A'}
+        🛒 Canteen - {getTableDisplayName()}
       </DialogTitle>
       <DialogContent sx={{ pt: 3 }}>
         <TableContainer 

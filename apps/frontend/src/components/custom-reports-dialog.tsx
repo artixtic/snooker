@@ -58,6 +58,7 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
     refetch();
   };
 
+  const gameTotals = report?.gameTotals || [];
   const snookerTotal = report?.snookerTotal || 0;
   const canteenTotal = report?.canteenTotal || 0;
   const total = report?.totalSales || 0;
@@ -256,12 +257,25 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
                   <TableContainer>
                     <Table size="small">
                       <TableBody>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 'medium' }}>🎱 Snooker/Billard</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
-                            PKR {Math.ceil(snookerTotal)}
-                          </TableCell>
-                        </TableRow>
+                        {/* Display each game's totals */}
+                        {gameTotals.map((game: any) => (
+                          <TableRow key={game.gameName}>
+                            <TableCell sx={{ fontWeight: 'medium' }}>
+                              🎮 {game.gameName} ({game.tableSessions} session{game.tableSessions !== 1 ? 's' : ''})
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                              PKR {Math.ceil(game.total)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {gameTotals.length === 0 && (
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 'medium' }}>🎱 Games Total</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>
+                              PKR {Math.ceil(snookerTotal)}
+                            </TableCell>
+                          </TableRow>
+                        )}
                         <TableRow>
                           <TableCell sx={{ fontWeight: 'medium' }}>🛒 Canteen</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 'bold', color: '#00BCD4' }}>

@@ -35,6 +35,17 @@ npx prisma migrate reset
 
 **Note:** This will also reset the database schema. Use this if you want a completely fresh start.
 
+### Using TypeScript Script (Recommended for Clearing Data Only)
+
+A TypeScript script is available that clears all data while preserving the schema:
+
+```bash
+cd apps/backend
+npx ts-node prisma/clear-database.ts
+```
+
+**Note:** This script clears all data including games and tables, but preserves users by default. It respects foreign key constraints and deletes in the correct order.
+
 ## SQL Queries
 
 ### Option 1: DELETE (Safer)
@@ -54,7 +65,6 @@ DELETE FROM table_rate_rules;
 DELETE FROM table_maintenance;
 DELETE FROM bookings;
 DELETE FROM expenses;
-DELETE FROM credit_transactions;
 DELETE FROM sale_items;
 DELETE FROM sales;
 DELETE FROM inventory_movements;
@@ -62,7 +72,7 @@ DELETE FROM activity_logs;
 DELETE FROM sync_log;
 DELETE FROM shifts;
 DELETE FROM tables;
-DELETE FROM members;
+DELETE FROM games;
 DELETE FROM products;
 DELETE FROM users;
 
@@ -87,7 +97,6 @@ TRUNCATE TABLE
   table_maintenance,
   bookings,
   expenses,
-  credit_transactions,
   sale_items,
   sales,
   inventory_movements,
@@ -95,7 +104,7 @@ TRUNCATE TABLE
   sync_log,
   shifts,
   tables,
-  members,
+  games,
   products,
   users
 CASCADE;
@@ -136,17 +145,16 @@ npx prisma migrate deploy
 8. `table_maintenance` - Table maintenance records
 9. `bookings` - Booking records
 10. `expenses` - Expense records
-11. `credit_transactions` - Credit transaction records
-12. `sale_items` - Sale item records
-13. `sales` - Sale records
-14. `inventory_movements` - Inventory movement records
-15. `activity_logs` - Activity log records
-16. `sync_log` - Sync log records
-17. `shifts` - Shift records
-18. `tables` - Table session records
-19. `members` - Member records
-20. `products` - Product records
-21. `users` - User records
+11. `sale_items` - Sale item records
+12. `sales` - Sale records
+13. `inventory_movements` - Inventory movement records
+14. `activity_logs` - Activity log records
+15. `sync_log` - Sync log records
+16. `shifts` - Shift records
+17. `tables` - Table session records (must be deleted before games)
+18. `games` - Game records
+19. `products` - Product records
+20. `users` - User records
 
 ## After Clearing
 

@@ -21,6 +21,7 @@ import { TableRateRulesModule } from './table-rate-rules/table-rate-rules.module
 import { KitchenOrdersModule } from './kitchen-orders/kitchen-orders.module';
 import { MatchesModule } from './matches/matches.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
+import { GamesModule } from './games/games.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { TournamentsModule } from './tournaments/tournaments.module';
     KitchenOrdersModule,
     MatchesModule,
     TournamentsModule,
+    GamesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

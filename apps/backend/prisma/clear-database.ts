@@ -58,6 +58,9 @@ async function clearDatabase() {
     console.log('Deleting table sessions...');
     await prisma.tableSession.deleteMany();
 
+    console.log('Deleting games...');
+    await prisma.game.deleteMany();
+
     console.log('Deleting products...');
     await prisma.product.deleteMany();
 

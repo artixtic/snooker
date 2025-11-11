@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StartShiftDto } from './dto/start-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
@@ -112,15 +112,20 @@ export class ShiftsService {
             name: true,
           },
         },
+        table: {
+          include: {
+            game: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'asc',
       },
     });
 
-    // Calculate canteen sales (from sale items) and snooker sales (table charges)
+    // Calculate totals by game
+    const gameTotals: Record<string, { gameName: string; total: number; tableSessions: number }> = {};
     let canteenTotal = 0;
-    let snookerTotal = 0;
     
     sales.forEach((sale) => {
       // Calculate canteen total from items (subtotal + tax for each item)
@@ -130,14 +135,60 @@ export class ShiftsService {
       );
       canteenTotal += saleCanteenTotal;
       
-      // Snooker total is the table charge portion (sale subtotal minus canteen items subtotal before tax)
-      const canteenItemsSubtotal = sale.items.reduce(
-        (sum, item) => sum + Number(item.subtotal),
-        0
-      );
-      const tableCharge = Number(sale.subtotal) - canteenItemsSubtotal;
-      snookerTotal += tableCharge;
+      // Calculate table charge per game
+      if (sale.table && sale.table.game) {
+        const gameId = sale.table.game.id;
+        const gameName = sale.table.game.name;
+        
+        if (!gameTotals[gameId]) {
+          gameTotals[gameId] = {
+            gameName,
+            total: 0,
+            tableSessions: 0,
+          };
+        }
+        
+        // Table charge is the sale subtotal minus canteen items subtotal before tax
+        const canteenItemsSubtotal = sale.items.reduce(
+          (sum, item) => sum + Number(item.subtotal),
+          0
+        );
+        const tableCharge = Number(sale.subtotal) - canteenItemsSubtotal;
+        gameTotals[gameId].total += tableCharge;
+      }
     });
+    
+    // Count table sessions per game
+    const tableSessions = await this.prisma.tableSession.findMany({
+      where: {
+        startedAt: {
+          gte: shift.startedAt,
+          lte: endTime,
+        },
+      },
+      include: {
+        game: true,
+      },
+    });
+    
+    // Count sessions per game
+    tableSessions.forEach((session) => {
+      if (session.game) {
+        const gameId = session.game.id;
+        if (gameTotals[gameId]) {
+          gameTotals[gameId].tableSessions += 1;
+        } else {
+          gameTotals[gameId] = {
+            gameName: session.game.name,
+            total: 0,
+            tableSessions: 1,
+          };
+        }
+      }
+    });
+    
+    // Calculate total game sales (sum of all game totals)
+    const snookerTotal = Object.values(gameTotals).reduce((sum, game) => sum + game.total, 0);
     
     const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const totalCash = sales
@@ -167,15 +218,6 @@ export class ShiftsService {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
 
-    // Table sessions for this shift
-    const tableSessions = await this.prisma.tableSession.findMany({
-      where: {
-        startedAt: {
-          gte: shift.startedAt,
-          lte: endTime,
-        },
-      },
-    });
 
     // Calculate expenses for the shift period
     const expenses = await this.prisma.expense.findMany({
@@ -198,6 +240,7 @@ export class ShiftsService {
       salesTotal: totalSales,
       snookerTotal,
       canteenTotal,
+      gameTotals: Object.values(gameTotals),
       totalExpenses,
       totalCash,
       totalCard,
@@ -215,6 +258,27 @@ export class ShiftsService {
     }
     if (shift.status === 'CLOSED') {
       throw new Error('Shift is already closed');
+    }
+
+    // Check if there are any active tables (OCCUPIED or PAUSED)
+    const activeTables = await this.prisma.tableSession.findMany({
+      where: {
+        status: {
+          in: ['OCCUPIED', 'PAUSED'],
+        },
+      },
+      select: {
+        id: true,
+        tableNumber: true,
+        status: true,
+      },
+    });
+
+    if (activeTables.length > 0) {
+      const tableNumbers = activeTables.map(t => t.tableNumber).join(', ');
+      throw new BadRequestException(
+        `Cannot close shift. There are ${activeTables.length} active table(s): Table ${tableNumbers}. Please close all tables before closing the shift.`
+      );
     }
 
     // Calculate sales total for this shift period (all sales during the shift, regardless of employee)
