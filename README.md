@@ -19,202 +19,53 @@ Built with Electron, Next.js, NestJS, and PostgreSQL
 
 ## 📸 UI Preview
 
+> **Note**: GitHub markdown doesn't render HTML with inline styles. For the best visual representation, please add actual screenshots to the `docs/screenshots/` directory. See [SCREENSHOTS_GUIDE.md](./SCREENSHOTS_GUIDE.md) for instructions.
+
 ### Dashboard View
 *Main dashboard showing game-based table management with real-time timers*
 
-<div style="max-width: 1400px; margin: 20px auto; padding: 20px; background: #f5f7fa; border-radius: 12px;">
+#### 🎮 Snooker Section
+**Rate Type:** `Per Minute` | **Description:** Snooker tables
 
-<!-- Snooker Game Section -->
-<div style="margin-bottom: 40px;">
-  <!-- Game Header -->
-  <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border: 2px solid rgba(102, 126, 234, 0.4); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);">
-    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-      <h3 style="margin: 0; font-size: 28px; font-weight: bold; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🎮 Snooker</h3>
-      <span style="background: linear-gradient(45deg, #4CAF50 30%, #45a049 90%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">Per Minute</span>
-      <span style="opacity: 0.8; flex: 1;">Snooker tables</span>
-    </div>
-  </div>
-  
-  <!-- Table Cards Grid -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-    
-    <!-- Snooker 1 - AVAILABLE -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎱 Snooker 1</h4>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">(8 PKR/min)</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="margin-top: 30px;">
-        <button style="background: linear-gradient(45deg, #FFD700 30%, #FFA500 90%); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);">🕐 VIEW HISTORY</button>
-        <button style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;">⚠️ START SHIFT FIRST</button>
-      </div>
-    </div>
-    
-    <!-- Snooker 2 - OCCUPIED -->
-    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎱 Snooker 2</h4>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 8px; padding: 15px; margin: 10px 0;">
-        <div style="font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">00:45:23</div>
-        <div style="font-size: 18px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: 5px;">PKR 48.00</div>
-      </div>
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button style="background: linear-gradient(45deg, #FF9800 30%, #F57C00 90%); border: none; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);">⏸️ Pause</button>
-        <button style="background: linear-gradient(45deg, #4CAF50 30%, #45a049 90%); border: none; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);">💳 Checkout</button>
-      </div>
-    </div>
-    
-    <!-- Snooker 3 - AVAILABLE -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎱 Snooker 3</h4>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">(8 PKR/min)</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="margin-top: 30px;">
-        <button style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;">⚠️ START SHIFT FIRST</button>
-      </div>
-    </div>
-  </div>
-</div>
+| Table | Status | Rate | Actions |
+|-------|--------|------|---------|
+| 🎱 **Snooker 1** | 🟣 AVAILABLE | 8 PKR/min | `[VIEW HISTORY]` `[START SHIFT FIRST]` |
+| 🎱 **Snooker 2** | 🔴 OCCUPIED | - | Timer: `00:45:23`<br>Charge: `PKR 48.00`<br>`[Pause]` `[Checkout]` |
+| 🎱 **Snooker 3** | 🟣 AVAILABLE | 8 PKR/min | `[START SHIFT FIRST]` |
 
-<!-- Table Tennis Game Section -->
-<div style="margin-bottom: 40px;">
-  <!-- Game Header -->
-  <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border: 2px solid rgba(102, 126, 234, 0.4); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);">
-    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-      <h3 style="margin: 0; font-size: 28px; font-weight: bold; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🎮 Table Tennis</h3>
-      <span style="background: linear-gradient(45deg, #4CAF50 30%, #45a049 90%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">Per Minute</span>
-      <span style="opacity: 0.8; flex: 1;">Table Tennis tables</span>
-    </div>
-  </div>
-  
-  <!-- Table Cards Grid -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-    
-    <!-- Table Tennis 1 - AVAILABLE -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎮 Table Tennis 1</h4>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">(6 PKR/min)</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="margin-top: 30px;">
-        <button style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;">⚠️ START SHIFT FIRST</button>
-      </div>
-    </div>
-    
-    <!-- Table Tennis 2 - AVAILABLE -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎮 Table Tennis 2</h4>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">(6 PKR/min)</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="margin-top: 30px;">
-        <button style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;">⚠️ START SHIFT FIRST</button>
-      </div>
-    </div>
-  </div>
-</div>
+**Card Colors:**
+- 🟣 **Purple Gradient** (`#667eea` → `#764ba2`) - AVAILABLE tables
+- 🔴 **Pink/Red Gradient** (`#f093fb` → `#f5576c`) - OCCUPIED tables
+- 🔵 **Blue Gradient** (`#4facfe` → `#00f2fe`) - PAUSED tables
 
-<!-- PlayStation Game Section -->
-<div style="margin-bottom: 40px;">
-  <!-- Game Header -->
-  <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%); border: 2px solid rgba(102, 126, 234, 0.4); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);">
-    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-      <h3 style="margin: 0; font-size: 28px; font-weight: bold; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🎮 PlayStation</h3>
-      <span style="background: linear-gradient(45deg, #FF9800 30%, #F57C00 90%); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;">Per Hour</span>
-      <span style="opacity: 0.8; flex: 1;">PlayStation gaming stations</span>
-    </div>
-  </div>
-  
-  <!-- Table Cards Grid -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-    
-    <!-- PlayStation 1 - AVAILABLE -->
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎮 PlayStation 1</h4>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">(200 PKR/hour)</p>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="margin-top: 30px;">
-        <button style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%;">⚠️ START SHIFT FIRST</button>
-      </div>
-    </div>
-    
-    <!-- PlayStation 2 - PAUSED -->
-    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); min-height: 180px; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div>
-          <h4 style="margin: 0; font-size: 20px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">🎮 PlayStation 2</h4>
-        </div>
-        <div style="display: flex; gap: 5px;">
-          <span style="color: white; font-size: 18px; cursor: pointer;">−</span>
-          <span style="color: white; font-size: 18px; cursor: pointer;">▼</span>
-        </div>
-      </div>
-      <div style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); border-radius: 8px; padding: 15px; margin: 10px 0;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <div style="font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">00:30:15</div>
-          <span style="background: linear-gradient(45deg, #FFD700 30%, #FFA500 90%); color: #000; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">PAUSED</span>
-        </div>
-        <div style="font-size: 18px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: 5px;">PKR 100.50</div>
-        <div style="font-size: 12px; opacity: 0.9; margin-top: 5px;">⏸️ Timer paused - not charging</div>
-      </div>
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button style="background: linear-gradient(45deg, #4CAF50 30%, #45a049 90%); border: none; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);">▶️ Resume</button>
-        <button style="background: linear-gradient(45deg, #4CAF50 30%, #45a049 90%); border: none; color: white; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; flex: 1; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);">💳 Checkout</button>
-      </div>
-    </div>
-  </div>
-</div>
+#### 🎮 Table Tennis Section
+**Rate Type:** `Per Minute` | **Description:** Table Tennis tables
 
-<!-- Create Table Card -->
-<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px;">
-  <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(17, 153, 142, 0.3); min-height: 180px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.3s ease;">
-    <div style="text-align: center;">
-      <div style="font-size: 40px; margin-bottom: 10px;">➕</div>
-      <h4 style="margin: 0; font-size: 18px; font-weight: bold;">Create Table</h4>
-    </div>
-  </div>
-</div>
+| Table | Status | Rate | Actions |
+|-------|--------|------|---------|
+| 🎮 **Table Tennis 1** | 🟣 AVAILABLE | 6 PKR/min | `[START SHIFT FIRST]` |
+| 🎮 **Table Tennis 2** | 🟣 AVAILABLE | 6 PKR/min | `[START SHIFT FIRST]` |
 
-</div>
+#### 🎮 PlayStation Section
+**Rate Type:** `Per Hour` | **Description:** PlayStation gaming stations
+
+| Table | Status | Rate | Actions |
+|-------|--------|------|---------|
+| 🎮 **PlayStation 1** | 🟣 AVAILABLE | 200 PKR/hour | `[START SHIFT FIRST]` |
+| 🎮 **PlayStation 2** | 🔵 PAUSED | - | Timer: `00:30:15`<br>Charge: `PKR 100.50`<br>`[Resume]` `[Checkout]` |
+
+#### ➕ Create Table Card
+**Color:** 🟢 Green Gradient (`#11998e` → `#38ef7d`)
+
+---
+
+**Visual Design Features:**
+- ✨ Gradient backgrounds for each card based on status
+- 🎨 Game section headers with rate type badges
+- 📊 Expandable/collapsible table cards
+- ⏱️ Real-time timer display for active tables
+- 💰 Current charge calculation
+- 🎯 Color-coded status indicators
 
 ### Checkout Dialog
 *Checkout interface with table charges, canteen items, tax calculation, and payment processing*
