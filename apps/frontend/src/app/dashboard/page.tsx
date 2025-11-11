@@ -46,6 +46,8 @@ import {
   ExpandLess,
 } from '@mui/icons-material';
 import api from '@/lib/api';
+import { db } from '@/lib/db';
+import { addToSyncQueue } from '@/lib/sync';
 import { TableHistoryDialog } from '@/components/table-history-dialog';
 import { InventoryDialog } from '@/components/inventory-dialog';
 import { CanteenDialog } from '@/components/canteen-dialog';
@@ -54,6 +56,7 @@ import { ReportsDialog } from '@/components/reports-dialog';
 import { CustomReportsDialog } from '@/components/custom-reports-dialog';
 import { ShiftModal } from '@/components/shift-modal';
 import { GamesDialog } from '@/components/games-dialog';
+import { OfflineIndicator } from '@/components/offline-indicator';
 
 interface Table {
   id: string;
@@ -129,8 +132,26 @@ export default function DashboardPage() {
   const { data: shifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      const response = await api.get('/shifts');
-      return response.data;
+      // If offline, check local DB first
+      if (!navigator.onLine) {
+        const localShifts = await db.shifts.toArray();
+        return localShifts;
+      }
+      
+      try {
+        const response = await api.get('/shifts');
+        const serverShifts = response.data;
+        
+        // Cache in local DB
+        for (const shift of serverShifts) {
+          await db.shifts.put(shift);
+        }
+        
+        return serverShifts;
+      } catch {
+        // Fallback to local DB on error
+        return await db.shifts.toArray();
+      }
     },
   });
 
@@ -178,10 +199,7 @@ export default function DashboardPage() {
         throw new Error('Table not found');
       }
       
-      // Stop the table
-      const tableResponse = await api.post('/tables/' + tableId + '/stop', {
-        paymentAmount,
-      });
+      const isOnline = navigator.onLine;
       
       // Calculate totals (rounded up to integers)
       const tableCharge = Math.ceil(Number(table.currentCharge) || 0);
@@ -192,6 +210,61 @@ export default function DashboardPage() {
       const cartTax = taxEnabled ? Math.ceil(cartItemsTotal * 0.15) : 0;
       const tax = tableTax + cartTax; // Total tax on both table and cart items
       const total = Math.ceil(subtotal + tax);
+      
+      let tableResponse: any;
+      
+      // Stop the table - try online first, fallback to offline
+      if (isOnline) {
+        try {
+          tableResponse = await api.post('/tables/' + tableId + '/stop', {
+            paymentAmount,
+          });
+          // Save to local DB
+          if (tableResponse.data) {
+            await db.tables.put({ ...tableResponse.data, id: tableId });
+          }
+        } catch (error: any) {
+          if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+            // Offline: update local table state
+            const updatedTable = {
+              ...table,
+              status: 'AVAILABLE' as const,
+              currentCharge: 0,
+              startedAt: null,
+              pausedAt: null,
+              totalPausedTime: 0,
+              lastResumedAt: null,
+            };
+            await db.tables.put({ ...updatedTable, id: tableId });
+            tableResponse = { data: updatedTable };
+            // Queue for sync
+            await addToSyncQueue('table', 'update', tableId, {
+              status: 'AVAILABLE',
+              currentCharge: 0,
+            });
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // Offline: update local table state
+        const updatedTable = {
+          ...table,
+          status: 'AVAILABLE' as const,
+          currentCharge: 0,
+          startedAt: null,
+          pausedAt: null,
+          totalPausedTime: 0,
+          lastResumedAt: null,
+        };
+        await db.tables.put({ ...updatedTable, id: tableId });
+        tableResponse = { data: updatedTable };
+        // Queue for sync
+        await addToSyncQueue('table', 'update', tableId, {
+          status: 'AVAILABLE',
+          currentCharge: 0,
+        });
+      }
       
         // Create sale for table charge + cart items (unless skipSale is true)
         if (!skipSale && total > 0) {
@@ -212,7 +285,7 @@ export default function DashboardPage() {
             };
           }) || [];
           
-          await api.post('/sales', {
+          const saleData = {
             tableId,
             subtotal: subtotal,
             tax: tax > 0 ? tax : undefined, // Only include tax if enabled and > 0
@@ -221,7 +294,43 @@ export default function DashboardPage() {
             cashReceived: Math.ceil(Number(paymentAmount)),
             change: Math.ceil(Math.max(0, paymentAmount - total)),
             items: saleItems,
-          });
+          };
+          
+          if (isOnline) {
+            try {
+              const saleResponse = await api.post('/sales', saleData);
+              // Save to local DB
+              if (saleResponse.data) {
+                await db.sales.put({ ...saleResponse.data, synced: true });
+              }
+            } catch (error: any) {
+              if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+                // Offline: save to local DB and queue for sync
+                const localSaleId = `local_sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                const localSale = {
+                  ...saleData,
+                  id: localSaleId,
+                  createdAt: new Date().toISOString(),
+                  synced: false,
+                };
+                await db.sales.put(localSale);
+                await addToSyncQueue('sale', 'create', localSaleId, saleData);
+              } else {
+                throw error;
+              }
+            }
+          } else {
+            // Offline: save to local DB and queue for sync
+            const localSaleId = `local_sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const localSale = {
+              ...saleData,
+              id: localSaleId,
+              createdAt: new Date().toISOString(),
+              synced: false,
+            };
+            await db.sales.put(localSale);
+            await addToSyncQueue('sale', 'create', localSaleId, saleData);
+          }
         }
       
       return { tableResponse: tableResponse.data, tableId };
@@ -857,9 +966,10 @@ export default function DashboardPage() {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold', fontSize: '1.5rem', letterSpacing: 1 }}>
             🎱 Smart Cue
           </Typography>
-          <Typography variant="body2" sx={{ mr: 3 }}>
+          <Typography variant="body2" sx={{ mr: 2 }}>
             +92 316 1126671
           </Typography>
+          <OfflineIndicator compact />
           {!activeShift && (
             <Button
               variant="contained"

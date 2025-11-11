@@ -51,6 +51,12 @@ export class SyncService {
           return this.syncInventoryMovement(op, clientId, tx);
         case 'table':
           return this.syncTable(op, clientId, tx);
+        case 'shift':
+          return this.syncShift(op, clientId, tx);
+        case 'game':
+          return this.syncGame(op, clientId, tx);
+        case 'expense':
+          return this.syncExpense(op, clientId, tx);
         default:
           throw new BadRequestException(`Unknown entity type: ${op.entity}`);
       }
@@ -201,15 +207,165 @@ export class SyncService {
     const payload = op.payload;
 
     if (op.action === 'create' || op.action === 'update') {
-      const table = await tx.tableSession.upsert({
-        where: { tableNumber: payload.tableNumber },
-        create: payload,
-        update: payload,
+      // Check if table exists by ID or tableNumber
+      let existing = null;
+      if (payload.id) {
+        existing = await tx.tableSession.findUnique({ where: { id: payload.id } });
+      }
+      if (!existing && payload.tableNumber) {
+        existing = await tx.tableSession.findUnique({ where: { tableNumber: payload.tableNumber } });
+      }
+
+      if (existing) {
+        // Update existing table
+        const table = await tx.tableSession.update({
+          where: { id: existing.id },
+          data: {
+            ...payload,
+            id: undefined, // Don't update ID
+          },
+        });
+        return { serverId: table.id };
+      } else {
+        // Create new table
+        const table = await tx.tableSession.create({
+          data: payload,
+        });
+        return { serverId: table.id };
+      }
+    }
+
+    if (op.action === 'delete') {
+      await tx.tableSession.delete({
+        where: { id: payload.id },
       });
-      return { serverId: table.id };
+      return { serverId: payload.id };
     }
 
     throw new BadRequestException(`Unknown action for table: ${op.action}`);
+  }
+
+  private async syncShift(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
+    const payload = op.payload;
+
+    if (op.action === 'create') {
+      const shift = await tx.shift.create({
+        data: payload,
+      });
+      return { serverId: shift.id };
+    }
+
+    if (op.action === 'update') {
+      const shift = await tx.shift.update({
+        where: { id: payload.id },
+        data: {
+          ...payload,
+          id: undefined,
+        },
+      });
+      return { serverId: shift.id };
+    }
+
+    throw new BadRequestException(`Unknown action for shift: ${op.action}`);
+  }
+
+  private async syncGame(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
+    const payload = op.payload;
+    const clientUpdatedAt = new Date(op.clientUpdatedAt);
+
+    if (op.action === 'create') {
+      // Check if game with same name exists
+      const existing = await tx.game.findUnique({ where: { name: payload.name } });
+      if (existing) {
+        return {
+          conflict: {
+            opId: op.opId,
+            entity: 'game',
+            action: op.action,
+            conflictType: 'state',
+            clientData: payload,
+            serverData: existing,
+            message: 'Game with same name already exists',
+          },
+        };
+      }
+
+      const game = await tx.game.create({
+        data: payload,
+      });
+      return { serverId: game.id };
+    }
+
+    if (op.action === 'update') {
+      const game = await tx.game.findUnique({ where: { id: payload.id } });
+      if (!game) {
+        throw new BadRequestException(`Game ${payload.id} not found`);
+      }
+
+      // Last Writer Wins
+      if (game.updatedAt > clientUpdatedAt) {
+        return {
+          conflict: {
+            opId: op.opId,
+            entity: 'game',
+            action: op.action,
+            conflictType: 'timestamp',
+            clientData: payload,
+            serverData: game,
+            message: 'Server version is newer',
+          },
+        };
+      }
+
+      const updated = await tx.game.update({
+        where: { id: payload.id },
+        data: {
+          ...payload,
+          id: undefined,
+        },
+      });
+      return { serverId: updated.id };
+    }
+
+    if (op.action === 'delete') {
+      await tx.game.delete({
+        where: { id: payload.id },
+      });
+      return { serverId: payload.id };
+    }
+
+    throw new BadRequestException(`Unknown action for game: ${op.action}`);
+  }
+
+  private async syncExpense(op: any, clientId: string, tx: any): Promise<{ conflict?: ConflictResponse; serverId?: string }> {
+    const payload = op.payload;
+
+    if (op.action === 'create') {
+      const expense = await tx.expense.create({
+        data: payload,
+      });
+      return { serverId: expense.id };
+    }
+
+    if (op.action === 'update') {
+      const expense = await tx.expense.update({
+        where: { id: payload.id },
+        data: {
+          ...payload,
+          id: undefined,
+        },
+      });
+      return { serverId: expense.id };
+    }
+
+    if (op.action === 'delete') {
+      await tx.expense.delete({
+        where: { id: payload.id },
+      });
+      return { serverId: payload.id };
+    }
+
+    throw new BadRequestException(`Unknown action for expense: ${op.action}`);
   }
 
   private async generateReceiptNumber(tx: any): Promise<string> {
@@ -259,6 +415,33 @@ export class SyncService {
       where: {
         updatedAt: { gte: since },
       },
+      include: {
+        game: true,
+      },
+      take: limit,
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const shiftRecords = await this.prisma.shift.findMany({
+      where: {
+        updatedAt: { gte: since },
+      },
+      take: limit,
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const gameRecords = await this.prisma.game.findMany({
+      where: {
+        updatedAt: { gte: since },
+      },
+      take: limit,
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    const expenseRecords = await this.prisma.expense.findMany({
+      where: {
+        updatedAt: { gte: since },
+      },
       take: limit,
       orderBy: { updatedAt: 'asc' },
     });
@@ -269,6 +452,9 @@ export class SyncService {
       ...saleRecords.map((r) => ({ ...r, _entity: 'sale' })),
       ...inventoryRecords.map((r) => ({ ...r, _entity: 'inventory_movement' })),
       ...tableRecords.map((r) => ({ ...r, _entity: 'table' })),
+      ...shiftRecords.map((r) => ({ ...r, _entity: 'shift' })),
+      ...gameRecords.map((r) => ({ ...r, _entity: 'game' })),
+      ...expenseRecords.map((r) => ({ ...r, _entity: 'expense' })),
     ];
 
     for (const record of allRecords) {

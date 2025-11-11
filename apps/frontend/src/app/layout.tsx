@@ -18,7 +18,6 @@ export default function RootLayout({
       <body>
         <ErrorBoundary>
           <Providers>
-            <OfflineIndicator />
             {children}
           </Providers>
         </ErrorBoundary>

@@ -343,24 +343,38 @@ export class ShiftsService {
     const expectedCash = Number(shift.openingCash) + cashSalesTotal - totalExpenses;
     const cashDiscrepancy = Number(dto.closingCash) - expectedCash;
 
-    return this.prisma.shift.update({
-      where: { id },
-      data: {
-        status: 'CLOSED',
-        endedAt: new Date(),
-        closingCash: dto.closingCash,
-        salesTotal,
-        cashDiscrepancy,
-        notes: dto.notes,
-      },
-      include: {
-        employee: {
-          select: {
-            id: true,
-            name: true,
+    // Close the shift and delete expenses for this shift period
+    return this.prisma.$transaction(async (tx) => {
+      // Delete expenses for this shift period
+      await tx.expense.deleteMany({
+        where: {
+          date: {
+            gte: shift.startedAt,
+            lte: new Date(),
           },
         },
-      },
+      });
+
+      // Update shift status
+      return tx.shift.update({
+        where: { id },
+        data: {
+          status: 'CLOSED',
+          endedAt: new Date(),
+          closingCash: dto.closingCash,
+          salesTotal,
+          cashDiscrepancy,
+          notes: dto.notes,
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
     });
   }
 }

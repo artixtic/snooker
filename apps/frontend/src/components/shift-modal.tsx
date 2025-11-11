@@ -16,6 +16,8 @@ import {
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { db } from '@/lib/db';
+import { addToSyncQueue } from '@/lib/sync';
 
 interface ShiftModalProps {
   open: boolean;
@@ -35,8 +37,27 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     queryKey: ['shift', shiftId],
     queryFn: async () => {
       if (!shiftId) return null;
-      const response = await api.get(`/shifts/${shiftId}`);
-      return response.data;
+      
+      // If offline, check local DB first
+      if (!navigator.onLine) {
+        const localShift = await db.shifts.get(shiftId);
+        return localShift || null;
+      }
+      
+      try {
+        const response = await api.get(`/shifts/${shiftId}`);
+        const shiftData = response.data;
+        
+        // Cache in local DB
+        if (shiftData) {
+          await db.shifts.put(shiftData);
+        }
+        
+        return shiftData;
+      } catch {
+        // Fallback to local DB on error
+        return await db.shifts.get(shiftId) || null;
+      }
     },
     enabled: mode === 'close' && !!shiftId,
   });
@@ -48,11 +69,27 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     queryKey: ['shifts', 'active', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return null;
+      
+      // If offline, check local DB first
+      if (!navigator.onLine) {
+        const localShifts = await db.shifts.where('status').equals('ACTIVE').toArray();
+        return localShifts.find((s: any) => s.employeeId === currentUserId) || null;
+      }
+      
       try {
         const response = await api.get('/shifts');
-        return response.data.find((s: any) => s.status === 'ACTIVE' && s.employeeId === currentUserId) || null;
+        const serverShift = response.data.find((s: any) => s.status === 'ACTIVE' && s.employeeId === currentUserId);
+        
+        // Also cache in local DB
+        if (serverShift) {
+          await db.shifts.put(serverShift);
+        }
+        
+        return serverShift || null;
       } catch {
-        return null;
+        // Fallback to local DB on error
+        const localShifts = await db.shifts.where('status').equals('ACTIVE').toArray();
+        return localShifts.find((s: any) => s.employeeId === currentUserId) || null;
       }
     },
     enabled: mode === 'start' && !!currentUserId,
@@ -60,11 +97,57 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
 
   const startMutation = useMutation({
     mutationFn: async (data: { openingCash: number }) => {
-      const response = await api.post('/shifts/start', data);
-      return response.data;
+      const currentUserId = localStorage.getItem('userId');
+      if (!currentUserId) {
+        throw new Error('User ID not found');
+      }
+
+      // If online, try to create on server
+      if (navigator.onLine) {
+        try {
+          const response = await api.post('/shifts/start', data);
+          const shift = response.data;
+          
+          // Save to local DB
+          await db.shifts.put(shift);
+          
+          return shift;
+        } catch (error: any) {
+          // If error and we're still online, throw it
+          if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED') {
+            throw error;
+          }
+          // Fall through to offline handling
+        }
+      }
+
+      // Offline: create locally
+      const localShiftId = `local_shift_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const localShift = {
+        id: localShiftId,
+        employeeId: currentUserId,
+        openingCash: data.openingCash,
+        status: 'ACTIVE',
+        startedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to local DB
+      await db.shifts.add(localShift);
+
+      // Queue for sync
+      await addToSyncQueue('shift', 'create', localShiftId, {
+        employeeId: currentUserId,
+        openingCash: data.openingCash,
+        status: 'ACTIVE',
+      });
+
+      return localShift;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts', 'active'] });
       onClose();
       setOpeningCash('');
     },
