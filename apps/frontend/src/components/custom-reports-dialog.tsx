@@ -61,6 +61,9 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
   const gameTotals = report?.gameTotals || [];
   const snookerTotal = report?.snookerTotal || 0;
   const canteenTotal = report?.canteenTotal || 0;
+  const totalTaxes = report?.totalTaxes || 0;
+  const canteenTax = report?.canteenTax || 0;
+  const canteenSalesWithTax = report?.canteenSalesWithTax || 0;
   const total = report?.totalSales || 0;
   const expense = report?.totalExpenses || 0;
   const profit = total - expense;
@@ -283,9 +286,50 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
                           </TableCell>
                         </TableRow>
                         <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
-                          <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Total Sales</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Subtotal (Before Tax)</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#00BCD4' }}>
+                            PKR {Math.ceil(snookerTotal + canteenTotal)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
+                          <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Total Sales (With Tax)</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#00BCD4' }}>
                             PKR {Math.ceil(total)}
+                          </TableCell>
+                        </TableRow>
+                        
+                        {/* Detailed Tax Information */}
+                        <TableRow>
+                          <TableCell colSpan={2} sx={{ pt: 2, pb: 1, fontWeight: 'bold', fontSize: '0.95rem', color: '#FF9800' }}>
+                            💰 Tax Breakdown
+                          </TableCell>
+                        </TableRow>
+                        {gameTotals.map((game: any) => (
+                          game.tax > 0 && (
+                            <TableRow key={`tax-${game.gameName}`}>
+                              <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.85rem' }}>
+                                🎮 {game.gameName} Tax ({game.sessionsWithTax} of {game.tableSessions} sessions)
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.85rem' }}>
+                                PKR {Math.ceil(game.tax)}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        ))}
+                        {canteenTax > 0 && (
+                          <TableRow>
+                            <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.85rem' }}>
+                              🛒 Canteen Tax ({canteenSalesWithTax} sale{canteenSalesWithTax !== 1 ? 's' : ''} with tax)
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.85rem' }}>
+                              PKR {Math.ceil(canteenTax)}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        <TableRow sx={{ bgcolor: 'rgba(255, 152, 0, 0.1)' }}>
+                          <TableCell sx={{ fontWeight: 'bold', fontSize: '0.95rem' }}>💰 Total Taxes Collected</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#FF9800' }}>
+                            PKR {Math.ceil(totalTaxes)}
                           </TableCell>
                         </TableRow>
                       </TableBody>

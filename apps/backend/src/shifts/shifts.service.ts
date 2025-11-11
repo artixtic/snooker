@@ -124,16 +124,28 @@ export class ShiftsService {
     });
 
     // Calculate totals by game
-    const gameTotals: Record<string, { gameName: string; total: number; tableSessions: number }> = {};
+    const gameTotals: Record<string, { gameName: string; total: number; tableSessions: number; tax: number; sessionsWithTax: number }> = {};
     let canteenTotal = 0;
+    let canteenTax = 0;
+    let canteenSalesWithTax = 0;
     
     sales.forEach((sale) => {
-      // Calculate canteen total from items (subtotal + tax for each item)
-      const saleCanteenTotal = sale.items.reduce(
-        (sum, item) => sum + Number(item.subtotal) + Number(item.tax || 0),
+      // Calculate canteen total and tax from items
+      let saleCanteenTax = 0;
+      const saleCanteenSubtotal = sale.items.reduce(
+        (sum, item) => {
+          const itemTax = Number(item.tax || 0);
+          saleCanteenTax += itemTax;
+          return sum + Number(item.subtotal); // Only subtotal, tax is separate
+        },
         0
       );
-      canteenTotal += saleCanteenTotal;
+      // Canteen total should be WITHOUT tax (consistent with game totals)
+      canteenTotal += saleCanteenSubtotal;
+      canteenTax += saleCanteenTax;
+      if (saleCanteenTax > 0) {
+        canteenSalesWithTax += 1;
+      }
       
       // Calculate table charge per game
       if (sale.table && sale.table.game) {
@@ -145,6 +157,8 @@ export class ShiftsService {
             gameName,
             total: 0,
             tableSessions: 0,
+            tax: 0,
+            sessionsWithTax: 0,
           };
         }
         
@@ -155,6 +169,15 @@ export class ShiftsService {
         );
         const tableCharge = Number(sale.subtotal) - canteenItemsSubtotal;
         gameTotals[gameId].total += tableCharge;
+        
+        // Calculate table tax: sale.tax contains both table tax + cart tax
+        // So we need to subtract cart tax from sale.tax to get only table tax
+        const totalSaleTax = Number(sale.tax || 0);
+        const tableTax = totalSaleTax - saleCanteenTax; // Remove cart tax to get only table tax
+        gameTotals[gameId].tax += Math.max(0, tableTax); // Ensure non-negative
+        if (tableTax > 0) {
+          gameTotals[gameId].sessionsWithTax += 1;
+        }
       }
     });
     
@@ -182,6 +205,8 @@ export class ShiftsService {
             gameName: session.game.name,
             total: 0,
             tableSessions: 1,
+            tax: 0,
+            sessionsWithTax: 0,
           };
         }
       }
@@ -189,6 +214,9 @@ export class ShiftsService {
     
     // Calculate total game sales (sum of all game totals)
     const snookerTotal = Object.values(gameTotals).reduce((sum, game) => sum + game.total, 0);
+    
+    // Calculate total taxes collected (sum of all game taxes + canteen tax)
+    const totalTaxes = Object.values(gameTotals).reduce((sum, game) => sum + game.tax, 0) + canteenTax;
     
     const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
     const totalCash = sales
@@ -240,6 +268,9 @@ export class ShiftsService {
       salesTotal: totalSales,
       snookerTotal,
       canteenTotal,
+      totalTaxes,
+      canteenTax,
+      canteenSalesWithTax,
       gameTotals: Object.values(gameTotals),
       totalExpenses,
       totalCash,
@@ -292,7 +323,25 @@ export class ShiftsService {
     });
 
     const salesTotal = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
-    const cashDiscrepancy = Number(dto.closingCash) - (Number(shift.openingCash) + salesTotal);
+    // For cash discrepancy, only count CASH and MIXED payments (not CARD)
+    const cashSalesTotal = sales
+      .filter((s) => s.paymentMethod === 'CASH' || s.paymentMethod === 'MIXED')
+      .reduce((sum, sale) => sum + Number(sale.total), 0);
+    
+    // Calculate expenses for the shift period (expenses reduce cash in drawer)
+    const expenses = await this.prisma.expense.findMany({
+      where: {
+        date: {
+          gte: shift.startedAt,
+          lte: new Date(),
+        },
+      },
+    });
+    const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    
+    // Expected cash = Opening cash + Cash sales - Expenses
+    const expectedCash = Number(shift.openingCash) + cashSalesTotal - totalExpenses;
+    const cashDiscrepancy = Number(dto.closingCash) - expectedCash;
 
     return this.prisma.shift.update({
       where: { id },

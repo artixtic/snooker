@@ -19,6 +19,8 @@ import {
   Typography,
   TextField,
   Alert,
+  Snackbar,
+  AlertTitle,
 } from '@mui/material';
 import api from '@/lib/api';
 
@@ -31,6 +33,8 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   const [closingDialogOpen, setClosingDialogOpen] = useState(false);
   const [closingCash, setClosingCash] = useState('');
   const [notes, setNotes] = useState('');
+  const [successAlertOpen, setSuccessAlertOpen] = useState(false);
+  const [successData, setSuccessData] = useState<any>(null);
   const queryClient = useQueryClient();
 
   // Get active shift
@@ -118,15 +122,19 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       const response = await api.post(`/shifts/${activeShift.id}/close`, data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-report'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       setClosingDialogOpen(false);
       setClosingCash('');
       setNotes('');
-      alert('Shift closed successfully!');
-      onClose();
+      setSuccessData(data);
+      setSuccessAlertOpen(true);
+      // Close main dialog after a short delay
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     },
     onError: (error: any) => {
       alert(error?.response?.data?.message || 'Failed to close shift. Please try again.');
@@ -137,6 +145,9 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   const gameTotals = report?.gameTotals || [];
   const snookerTotal = report?.snookerTotal || 0;
   const canteenTotal = report?.canteenTotal || 0;
+  const totalTaxes = report?.totalTaxes || 0;
+  const canteenTax = report?.canteenTax || 0;
+  const canteenSalesWithTax = report?.canteenSalesWithTax || 0;
   const total = (report?.salesTotal || 0);
   const expense = report?.totalExpenses || 0;
   const profit = total - expense;
@@ -284,9 +295,50 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
                 </TableCell>
               </TableRow>
               <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
-                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Total Sales</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Subtotal (Before Tax)</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#00BCD4' }}>
+                  PKR {Math.ceil(snookerTotal + canteenTotal)}
+                </TableCell>
+              </TableRow>
+              <TableRow sx={{ bgcolor: 'rgba(0, 188, 212, 0.1)' }}>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Total Sales (With Tax)</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#00BCD4' }}>
                   PKR {Math.ceil(total)}
+                </TableCell>
+              </TableRow>
+              
+              {/* Detailed Tax Information */}
+              <TableRow>
+                <TableCell colSpan={2} sx={{ pt: 3, pb: 1, fontWeight: 'bold', fontSize: '1.05rem', color: '#FF9800' }}>
+                  💰 Tax Breakdown
+                </TableCell>
+              </TableRow>
+              {gameTotals.map((game: any) => (
+                game.tax > 0 && (
+                  <TableRow key={`tax-${game.gameName}`}>
+                    <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                      🎮 {game.gameName} Tax ({game.sessionsWithTax} of {game.tableSessions} sessions)
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.9rem' }}>
+                      PKR {Math.ceil(game.tax)}
+                    </TableCell>
+                  </TableRow>
+                )
+              ))}
+              {canteenTax > 0 && (
+                <TableRow>
+                  <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                    🛒 Canteen Tax ({canteenSalesWithTax} sale{canteenSalesWithTax !== 1 ? 's' : ''} with tax)
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.9rem' }}>
+                    PKR {Math.ceil(canteenTax)}
+                  </TableCell>
+                </TableRow>
+              )}
+              <TableRow sx={{ bgcolor: 'rgba(255, 152, 0, 0.1)' }}>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>💰 Total Taxes Collected</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#FF9800' }}>
+                  PKR {Math.ceil(totalTaxes)}
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -380,7 +432,13 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
                   Opening Cash: PKR {Math.ceil(Number(activeShift.openingCash || 0))}
                 </Typography>
                 <Typography variant="body2">
-                  Expected Cash: PKR {Math.ceil(Number(activeShift.openingCash || 0) + (report?.totalSales || 0))}
+                  Cash Sales: PKR {Math.ceil(report?.totalCash || 0)}
+                </Typography>
+                <Typography variant="body2" color="error">
+                  Expenses: PKR {Math.ceil(report?.totalExpenses || 0)}
+                </Typography>
+                <Typography variant="body2" fontWeight="bold" sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                  Expected Cash: PKR {Math.ceil(Number(activeShift.openingCash || 0) + (report?.totalCash || 0) - (report?.totalExpenses || 0))}
                 </Typography>
               </Alert>
               
@@ -460,6 +518,76 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Success Alert */}
+      <Snackbar
+        open={successAlertOpen}
+        autoHideDuration={6000}
+        onClose={() => setSuccessAlertOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{
+          mt: 2,
+        }}
+      >
+        <Alert
+          onClose={() => setSuccessAlertOpen(false)}
+          severity="success"
+          variant="filled"
+          sx={{
+            width: '100%',
+            minWidth: 400,
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(76, 175, 80, 0.4)',
+            background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+            color: 'white',
+            '& .MuiAlert-icon': {
+              color: 'white',
+              fontSize: '2rem',
+            },
+            '& .MuiAlert-action': {
+              color: 'white',
+              '& .MuiIconButton-root': {
+                color: 'white',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                },
+              },
+            },
+          }}
+        >
+          <AlertTitle sx={{ fontWeight: 'bold', fontSize: '1.2rem', mb: 1 }}>
+            ✅ Shift Closed Successfully!
+          </AlertTitle>
+          <Box sx={{ mt: 1 }}>
+            {successData && (
+              <>
+                <Typography variant="body2" sx={{ mb: 0.5, opacity: 0.95 }}>
+                  <strong>Closing Cash:</strong> PKR {Math.ceil(Number(successData.closingCash || 0))}
+                </Typography>
+                {successData.cashDiscrepancy !== undefined && (
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      mb: 0.5, 
+                      opacity: 0.95,
+                      color: Number(successData.cashDiscrepancy) === 0 ? '#C8E6C9' : Number(successData.cashDiscrepancy) > 0 ? '#FFF9C4' : '#FFCDD2',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    <strong>Cash Discrepancy:</strong> PKR {Math.ceil(Number(successData.cashDiscrepancy || 0))}
+                    {Number(successData.cashDiscrepancy) === 0 && ' ✓ Perfect!'}
+                    {Number(successData.cashDiscrepancy) > 0 && ' (Over)'}
+                    {Number(successData.cashDiscrepancy) < 0 && ' (Short)'}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.85rem', mt: 1, pt: 1, borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+                  Shift ended at {new Date(successData.endedAt).toLocaleString()}
+                </Typography>
+              </>
+            )}
+          </Box>
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 }

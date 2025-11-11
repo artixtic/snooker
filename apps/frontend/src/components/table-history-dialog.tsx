@@ -653,12 +653,47 @@ export function TableHistoryDialog({ open, onClose, table }: TableHistoryDialogP
                       <Typography variant="body1" fontWeight="bold" color="error">-PKR {Math.ceil(Number(selectedSale.discount))}</Typography>
                     </Box>
                   )}
-                  {selectedSale.tax && Number(selectedSale.tax) > 0 && (
-                    <Box display="flex" justifyContent="space-between" width="100%" maxWidth={350}>
-                      <Typography variant="body1" fontWeight="medium">Tax:</Typography>
-                      <Typography variant="body1" fontWeight="bold">PKR {Math.ceil(Number(selectedSale.tax))}</Typography>
-                    </Box>
-                  )}
+                  {(() => {
+                    // Calculate canteen tax from items
+                    const canteenTax = selectedSale.items?.reduce(
+                      (sum: number, item: any) => sum + Number(item.tax || 0),
+                      0
+                    ) || 0;
+                    
+                    // Calculate table tax: sale.tax contains both table tax + cart tax
+                    // So we subtract cart tax from sale.tax to get only table tax
+                    const totalSaleTax = Number(selectedSale.tax || 0);
+                    const tableTax = Math.max(0, totalSaleTax - canteenTax);
+                    
+                    const hasTableTax = tableTax > 0;
+                    const hasCanteenTax = canteenTax > 0;
+                    const hasAnyTax = totalSaleTax > 0;
+                    
+                    return (
+                      <>
+                        {hasAnyTax && (
+                          <>
+                            {hasTableTax && (
+                              <Box display="flex" justifyContent="space-between" width="100%" maxWidth={350}>
+                                <Typography variant="body1" fontWeight="medium">🎱 Table Tax:</Typography>
+                                <Typography variant="body1" fontWeight="bold">PKR {Math.ceil(tableTax)}</Typography>
+                              </Box>
+                            )}
+                            {hasCanteenTax && (
+                              <Box display="flex" justifyContent="space-between" width="100%" maxWidth={350}>
+                                <Typography variant="body1" fontWeight="medium">🛒 Canteen Tax:</Typography>
+                                <Typography variant="body1" fontWeight="bold">PKR {Math.ceil(canteenTax)}</Typography>
+                              </Box>
+                            )}
+                            <Box display="flex" justifyContent="space-between" width="100%" maxWidth={350} sx={{ pt: 0.5 }}>
+                              <Typography variant="body1" fontWeight="bold">Total Tax:</Typography>
+                              <Typography variant="body1" fontWeight="bold">PKR {Math.ceil(totalSaleTax)}</Typography>
+                            </Box>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
                   <Box sx={{ width: '100%', maxWidth: 350, my: 1 }}>
                     <Divider />
                   </Box>
