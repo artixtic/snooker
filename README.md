@@ -17,43 +17,353 @@ Built with Electron, Next.js, NestJS, and PostgreSQL
 
 ---
 
-## 📸 Screenshots
-
-> **Note**: To add actual screenshots, see [SCREENSHOTS_GUIDE.md](./SCREENSHOTS_GUIDE.md)
+## 📸 UI Preview
 
 ### Dashboard View
-![Dashboard](./docs/screenshots/dashboard.png)
 *Main dashboard showing game-based table management with real-time timers*
 
-### Table Management
-![Table Management](./docs/screenshots/table-management.png)
-*Create and manage tables grouped by games (Snooker, Table Tennis, PlayStation, Foosball)*
+<div align="center" style="margin: 20px 0;">
+
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; color: white; margin: 20px 0; max-width: 900px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="margin: 0;">🎱 Snooker Club POS</h2>
+    <div>
+      <button style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 5px; margin: 0 5px;">Start Shift</button>
+      <button style="background: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 5px; margin: 0 5px;">Manage Games</button>
+    </div>
+  </div>
+  
+  <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+    <h3 style="margin: 0 0 10px 0;">🎮 Snooker</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+      <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+        <div style="font-weight: bold; margin-bottom: 5px;">Snooker 1</div>
+        <div style="font-size: 12px; opacity: 0.9;">AVAILABLE</div>
+        <div style="background: #4CAF50; padding: 5px; border-radius: 5px; margin-top: 10px; text-align: center; cursor: pointer;">Start Table</div>
+      </div>
+      <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+        <div style="font-weight: bold; margin-bottom: 5px;">Snooker 2</div>
+        <div style="font-size: 12px; opacity: 0.9;">OCCUPIED</div>
+        <div style="margin-top: 10px;">
+          <div style="font-size: 24px; font-weight: bold;">00:45:23</div>
+          <div style="font-size: 14px;">PKR 48.00</div>
+        </div>
+        <div style="background: #FF9800; padding: 5px; border-radius: 5px; margin-top: 10px; text-align: center; cursor: pointer;">Checkout</div>
+      </div>
+    </div>
+  </div>
+  
+  <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin: 10px 0;">
+    <h3 style="margin: 0 0 10px 0;">🎮 Table Tennis</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+      <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+        <div style="font-weight: bold; margin-bottom: 5px;">Table Tennis 1</div>
+        <div style="font-size: 12px; opacity: 0.9;">AVAILABLE</div>
+        <div style="background: #4CAF50; padding: 5px; border-radius: 5px; margin-top: 10px; text-align: center; cursor: pointer;">Start Table</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
 
 ### Checkout Dialog
-![Checkout](./docs/screenshots/checkout.png)
 *Checkout interface with table charges, canteen items, tax calculation, and payment processing*
 
+<div align="center" style="margin: 20px 0;">
+
+<div style="background: white; border: 2px solid #e0e0e0; border-radius: 10px; padding: 25px; max-width: 500px; margin: 20px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+  <h2 style="margin: 0 0 20px 0; color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">💳 Checkout - Snooker 2</h2>
+  
+  <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+      <span style="color: #666;">🎱 Table Time (45:23):</span>
+      <span style="font-weight: bold; color: #333;">PKR 48.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+      <span style="color: #666;">🛒 Canteen Items:</span>
+      <span style="font-weight: bold; color: #333;">PKR 25.00</span>
+    </div>
+    <div style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span style="color: #666;">Subtotal:</span>
+        <span style="font-weight: bold;">PKR 73.00</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span style="color: #666;">Tax (15%):</span>
+        <span style="font-weight: bold; color: #FF9800;">PKR 10.95</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; color: #4CAF50; margin-top: 10px; padding-top: 10px; border-top: 2px solid #4CAF50;">
+        <span>Total:</span>
+        <span>PKR 83.95</span>
+      </div>
+    </div>
+  </div>
+  
+  <div style="margin-bottom: 15px;">
+    <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">Payment Method:</label>
+    <select style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;">
+      <option>Cash</option>
+      <option>Card</option>
+      <option>Mixed</option>
+    </select>
+  </div>
+  
+  <div style="margin-bottom: 20px;">
+    <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">Payment Amount:</label>
+    <input type="number" value="84.00" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;">
+  </div>
+  
+  <button style="width: 100%; background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white; border: none; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);">
+    ✅ Complete Sale
+  </button>
+</div>
+
+</div>
+
 ### Shift Closing Report
-![Shift Closing](./docs/screenshots/shift-closing.png)
 *Detailed shift closing report with game-based revenue breakdown and tax information*
 
+<div align="center" style="margin: 20px 0;">
+
+<div style="background: white; border: 2px solid #9C27B0; border-radius: 10px; padding: 25px; max-width: 700px; margin: 20px auto; box-shadow: 0 4px 6px rgba(156, 39, 176, 0.2);">
+  <h2 style="margin: 0 0 20px 0; color: #9C27B0; border-bottom: 2px solid #9C27B0; padding-bottom: 10px;">🔒 Shift Closing Report</h2>
+  
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+    <thead>
+      <tr style="background: #f5f5f5;">
+        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Category</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Amount (PKR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🎮 Snooker (2 sessions)</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">123.00</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🎮 Table Tennis (1 session)</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">59.00</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🛒 Canteen</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">41.00</td>
+      </tr>
+      <tr style="background: rgba(0, 188, 212, 0.1);">
+        <td style="padding: 12px; font-weight: bold; border-bottom: 2px solid #ddd;">Subtotal (Before Tax)</td>
+        <td style="padding: 12px; text-align: right; font-weight: bold; font-size: 18px; color: #00BCD4; border-bottom: 2px solid #ddd;">223.00</td>
+      </tr>
+      <tr style="background: rgba(0, 188, 212, 0.1);">
+        <td style="padding: 12px; font-weight: bold; border-bottom: 2px solid #ddd;">Total Sales (With Tax)</td>
+        <td style="padding: 12px; text-align: right; font-weight: bold; font-size: 18px; color: #00BCD4; border-bottom: 2px solid #ddd;">236.00</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+    <h3 style="margin: 0 0 10px 0; color: #FF9800;">💰 Tax Breakdown</h3>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+      <span>🎮 Snooker Tax (1 of 2 sessions)</span>
+      <span style="font-weight: bold; color: #FF9800;">PKR 9.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+      <span>🛒 Canteen Tax (1 sale with tax)</span>
+      <span style="font-weight: bold; color: #FF9800;">PKR 4.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-top: 10px; padding-top: 10px; border-top: 2px solid #FF9800;">
+      <span>Total Taxes Collected</span>
+      <span style="color: #FF9800;">PKR 13.00</span>
+    </div>
+  </div>
+  
+  <div style="background: #f5f5f5; padding: 15px; border-radius: 8px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+      <span style="font-weight: bold;">Opening Cash:</span>
+      <span style="font-weight: bold;">PKR 10.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+      <span>Cash Sales:</span>
+      <span>PKR 236.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: #f44336;">
+      <span>Expenses:</span>
+      <span>PKR 0.00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-top: 10px; padding-top: 10px; border-top: 2px solid #ddd;">
+      <span>Expected Cash:</span>
+      <span style="color: #4CAF50;">PKR 246.00</span>
+    </div>
+  </div>
+  
+  <button style="width: 100%; background: linear-gradient(135deg, #f44336 30%, #d32f2f 90%); color: white; border: none; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);">
+    🔒 Close Shift!
+  </button>
+</div>
+
+</div>
+
 ### Reports & Analytics
-![Reports](./docs/screenshots/reports.png)
 *Custom date range reports with game-specific analytics and detailed tax breakdown*
 
+<div align="center" style="margin: 20px 0;">
+
+<div style="background: white; border: 2px solid #00BCD4; border-radius: 10px; padding: 25px; max-width: 800px; margin: 20px auto; box-shadow: 0 4px 6px rgba(0, 188, 212, 0.2);">
+  <h2 style="margin: 0 0 20px 0; color: #00BCD4; border-bottom: 2px solid #00BCD4; padding-bottom: 10px;">📊 Custom Reports</h2>
+  
+  <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+    <div style="flex: 1;">
+      <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">Start Date:</label>
+      <input type="date" value="2025-11-01" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+    </div>
+    <div style="flex: 1;">
+      <label style="display: block; margin-bottom: 5px; color: #666; font-weight: bold;">End Date:</label>
+      <input type="date" value="2025-11-11" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+    </div>
+    <div style="display: flex; align-items: flex-end;">
+      <button style="background: #00BCD4; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">Generate Report</button>
+    </div>
+  </div>
+  
+  <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <h3 style="margin: 0 0 15px 0; color: #333;">Revenue Summary</h3>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+      <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #4CAF50;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Sales</div>
+        <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">PKR 1,250</div>
+      </div>
+      <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #FF9800;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total Taxes</div>
+        <div style="font-size: 24px; font-weight: bold; color: #FF9800;">PKR 187.50</div>
+      </div>
+      <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #2196F3;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Sessions</div>
+        <div style="font-size: 24px; font-weight: bold; color: #2196F3;">42</div>
+      </div>
+    </div>
+  </div>
+  
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background: #f5f5f5;">
+        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Game</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Sessions</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Revenue</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Tax</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🎮 Snooker</td>
+        <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">15</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">PKR 450</td>
+        <td style="padding: 10px; text-align: right; color: #FF9800; border-bottom: 1px solid #eee;">PKR 67.50</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🎮 Table Tennis</td>
+        <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">12</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">PKR 360</td>
+        <td style="padding: 10px; text-align: right; color: #FF9800; border-bottom: 1px solid #eee;">PKR 54.00</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🎮 PlayStation</td>
+        <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">8</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">PKR 240</td>
+        <td style="padding: 10px; text-align: right; color: #FF9800; border-bottom: 1px solid #eee;">PKR 36.00</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">🛒 Canteen</td>
+        <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">-</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #00BCD4; border-bottom: 1px solid #eee;">PKR 200</td>
+        <td style="padding: 10px; text-align: right; color: #FF9800; border-bottom: 1px solid #eee;">PKR 30.00</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <div style="margin-top: 20px; display: flex; gap: 10px;">
+    <button style="flex: 1; background: #4CAF50; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">📥 Export Excel</button>
+    <button style="flex: 1; background: #f44336; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer;">📄 Export PDF</button>
+  </div>
+</div>
+
+</div>
+
 ### Inventory Management
-![Inventory](./docs/screenshots/inventory.png)
 *Product management with stock tracking, barcode support, and low stock alerts*
 
----
+<div align="center" style="margin: 20px 0;">
 
-**📝 Screenshot Placeholders**: The screenshots above are placeholders. To add actual screenshots:
-1. Create a `docs/screenshots/` directory
-2. Take screenshots of your application
-3. Save them with the names shown above
-4. The README will automatically display them
+<div style="background: white; border: 2px solid #4CAF50; border-radius: 10px; padding: 25px; max-width: 900px; margin: 20px auto; box-shadow: 0 4px 6px rgba(76, 175, 80, 0.2);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="margin: 0; color: #4CAF50; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; flex: 1;">📦 Inventory Management</h2>
+    <button style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-left: 20px;">+ Add Product</button>
+  </div>
+  
+  <div style="margin-bottom: 20px;">
+    <input type="text" placeholder="🔍 Search products by name, SKU, or barcode..." style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;">
+  </div>
+  
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background: #f5f5f5;">
+        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Product</th>
+        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Category</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Price</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Stock</th>
+        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">
+          <div style="font-weight: bold;">Coca Cola</div>
+          <div style="font-size: 12px; color: #666;">SKU: DRK-001</div>
+        </td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">Drinks</td>
+        <td style="padding: 12px; text-align: right; font-weight: bold; color: #4CAF50; border-bottom: 1px solid #eee;">PKR 2.50</td>
+        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
+          <span style="background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;">100</span>
+        </td>
+        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+          <button style="background: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Edit</button>
+          <button style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Delete</button>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">
+          <div style="font-weight: bold;">Snickers</div>
+          <div style="font-size: 12px; color: #666;">SKU: SNK-001</div>
+        </td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">Snacks</td>
+        <td style="padding: 12px; text-align: right; font-weight: bold; color: #4CAF50; border-bottom: 1px solid #eee;">PKR 3.00</td>
+        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
+          <span style="background: #FF9800; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;">5</span>
+          <span style="font-size: 12px; color: #f44336; margin-left: 5px;">⚠️ Low Stock</span>
+        </td>
+        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+          <button style="background: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Edit</button>
+          <button style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Delete</button>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">
+          <div style="font-weight: bold;">Water Bottle</div>
+          <div style="font-size: 12px; color: #666;">SKU: DRK-003</div>
+        </td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">Drinks</td>
+        <td style="padding: 12px; text-align: right; font-weight: bold; color: #4CAF50; border-bottom: 1px solid #eee;">PKR 1.50</td>
+        <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
+          <span style="background: #4CAF50; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;">143</span>
+        </td>
+        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+          <button style="background: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Edit</button>
+          <button style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; margin: 0 2px; cursor: pointer;">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
-See [SCREENSHOTS_GUIDE.md](./SCREENSHOTS_GUIDE.md) for detailed instructions.
+</div>
 
 ---
 
