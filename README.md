@@ -1,41 +1,193 @@
-# Snooker Club POS System
+# 🎱 Snooker Club POS System
 
-A complete, production-ready offline-first Point of Sale (POS) system for Snooker Clubs, built with Electron, Next.js, and NestJS.
+<div align="center">
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-Proprietary-red.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.3.3-blue.svg)
+
+**A complete, production-ready offline-first Point of Sale (POS) system for Snooker Clubs**
+
+Built with Electron, Next.js, NestJS, and PostgreSQL
+
+[Features](#-key-features) • [Installation](#-installation) • [Usage](#-usage) • [Documentation](#-documentation)
+
+</div>
+
+---
+
+## 📸 Screenshots
+
+> **Note**: To add actual screenshots, see [SCREENSHOTS_GUIDE.md](./SCREENSHOTS_GUIDE.md)
+
+### Dashboard View
+![Dashboard](./docs/screenshots/dashboard.png)
+*Main dashboard showing game-based table management with real-time timers*
+
+### Table Management
+![Table Management](./docs/screenshots/table-management.png)
+*Create and manage tables grouped by games (Snooker, Table Tennis, PlayStation, Foosball)*
+
+### Checkout Dialog
+![Checkout](./docs/screenshots/checkout.png)
+*Checkout interface with table charges, canteen items, tax calculation, and payment processing*
+
+### Shift Closing Report
+![Shift Closing](./docs/screenshots/shift-closing.png)
+*Detailed shift closing report with game-based revenue breakdown and tax information*
+
+### Reports & Analytics
+![Reports](./docs/screenshots/reports.png)
+*Custom date range reports with game-specific analytics and detailed tax breakdown*
+
+### Inventory Management
+![Inventory](./docs/screenshots/inventory.png)
+*Product management with stock tracking, barcode support, and low stock alerts*
+
+---
+
+**📝 Screenshot Placeholders**: The screenshots above are placeholders. To add actual screenshots:
+1. Create a `docs/screenshots/` directory
+2. Take screenshots of your application
+3. Save them with the names shown above
+4. The README will automatically display them
+
+See [SCREENSHOTS_GUIDE.md](./SCREENSHOTS_GUIDE.md) for detailed instructions.
+
+---
+
+## 🎯 Key Features
+
+### 🎮 Game Management
+- **Multiple Game Types**: Support for Snooker, Table Tennis, PlayStation, Foosball, and custom games
+- **Flexible Rate Types**: Per-minute or per-hour billing based on game type
+- **Game-Specific Defaults**: Each game has its own default rate and configuration
+- **CRUD Operations**: Full create, read, update, and delete functionality for games
+
+### 🎱 Table Management
+- **Game-Linked Tables**: Tables are automatically linked to games
+- **Real-Time Timers**: Live tracking of table usage with pause/resume functionality
+- **Expandable Cards**: Tables start collapsed and expand when active
+- **Status Tracking**: AVAILABLE, OCCUPIED, PAUSED, RESERVED states
+- **Dynamic Naming**: Tables display as "Game Name 1", "Game Name 2", etc.
+
+### 💰 POS Functionality
+- **Table Check-in**: Start table sessions with custom rate per hour/minute
+- **Shopping Cart**: Add canteen items with quantity and pricing
+- **Tax Calculation**: Optional 15% tax on table charges and/or canteen items
+- **Payment Methods**: Cash, Card, Mixed, and Credit payment options
+- **Receipt Generation**: Print receipts via thermal printer or PDF export
+- **Bill Details**: Separate display of table tax and canteen tax
+
+### 📊 Shift Management
+- **Shift Tracking**: Start and end shifts with employee assignment
+- **Cash Reconciliation**: 
+  - Opening cash tracking
+  - Expected cash calculation (Opening + Cash Sales - Expenses)
+  - Closing cash input
+  - Cash discrepancy calculation
+- **Validation**: Prevents closing shift if tables are still active
+- **Shift Reports**: Game-based revenue breakdown with session counts
+
+### 📈 Reports & Analytics
+- **Daily Reports**: Sales summaries grouped by games
+- **Custom Reports**: Date range reports with game-specific analytics
+- **Tax Breakdown**: Detailed tax information showing:
+  - Game-specific taxes with session counts
+  - Canteen tax with sales count
+  - Total taxes collected
+- **Revenue Tracking**: Subtotal (before tax) and total sales (with tax)
+- **Export Options**: Excel (XLSX) and PDF formats
+
+### 🏪 Inventory Management
+- **Product CRUD**: Full product management with categories
+- **Stock Tracking**: Real-time inventory movements and adjustments
+- **Barcode Support**: USB scanner and camera scanning
+- **Low Stock Alerts**: Automatic notifications when stock is low
+- **Stock Validation**: Prevents checkout if items are out of stock
+
+### 🔄 Offline-First Architecture
+- **Local Database**: Dexie.js (IndexedDB) for offline operations
+- **Sync Queue**: Automatic sync on reconnect
+- **Conflict Resolution**: Last Writer Wins (LWW) with admin review UI
+- **Multi-terminal Support**: Multiple devices can sync independently
+
+### 🔐 Security & Authentication
+- **JWT Tokens**: Access and refresh tokens with HTTP-only cookies
+- **Role-Based Access**: ADMIN and EMPLOYEE roles
+- **Secure IPC**: Electron context isolation with preload scripts
+- **Input Validation**: DTO validation with class-validator
+
+---
 
 ## 🏗️ Architecture
 
-- **Frontend**: Next.js (App Router) with Material UI v5
-- **Backend**: NestJS with Prisma and PostgreSQL
-- **Desktop**: Electron with native printer support
-- **Offline**: Dexie.js (IndexedDB) with sync queue
-- **Database**: PostgreSQL (Docker)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Electron Desktop App                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Frontend   │  │   Backend    │  │   Printer    │     │
+│  │   Next.js    │◄─┤   NestJS     │  │   Support    │     │
+│  │              │  │              │  │              │     │
+│  │  Material UI │  │   Prisma     │  │  ESC/POS     │     │
+│  │  React Query │  │   PostgreSQL │  │  PDF Export  │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│         │                  │                                │
+│         └──────────────────┘                                │
+│                    │                                        │
+│         ┌──────────▼──────────┐                            │
+│         │   IndexedDB (Dexie) │                            │
+│         │   Offline Storage   │                            │
+│         └─────────────────────┘                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Tech Stack
+
+**Frontend:**
+- ⚛️ **Next.js 14** (App Router) - React framework
+- 🎨 **Material UI v5** - Component library
+- 🔄 **React Query** - Data fetching and caching
+- 💾 **Dexie.js** - IndexedDB wrapper for offline storage
+- 📊 **Zustand** - State management
+
+**Backend:**
+- 🚀 **NestJS** - Node.js framework
+- 🗄️ **Prisma** - ORM and database toolkit
+- 🐘 **PostgreSQL** - Relational database
+- 🔐 **Passport.js** - Authentication
+- 📡 **Socket.io** - Real-time updates
+
+**Desktop:**
+- ⚡ **Electron** - Desktop application framework
+- 🖨️ **ESC/POS** - Thermal printer support
+- 📄 **PDFMake** - PDF generation
+
+---
 
 ## 📋 Prerequisites
-
-### macOS Requirements
 
 - **Node.js**: >= 18.0.0
 - **pnpm**: >= 8.0.0 (recommended) or npm >= 9.0.0
 - **Docker Desktop**: For running PostgreSQL (optional, can use local PostgreSQL)
-- **Xcode Command Line Tools**: `xcode-select --install`
-
-## 🚀 Quick Start
+- **Git**: For cloning the repository
 
 ### Windows Users
-**👉 See [WINDOWS_SETUP.md](./WINDOWS_SETUP.md) for complete Windows-specific setup guide**
+👉 See [WINDOWS_SETUP.md](./WINDOWS_SETUP.md) for complete Windows-specific setup guide
 
-Quick start on Windows:
-```powershell
-# Run the automated setup script
-.\WINDOWS_QUICK_START.ps1
+---
 
-# Then start the application
-pnpm dev
+## 🚀 Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/snooker-pos.git
+cd snooker-pos
 ```
 
-### macOS/Linux Users
-
-### 1. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 pnpm install
@@ -43,16 +195,11 @@ pnpm install
 npm install
 ```
 
-### 2. Setup Environment
+### 3. Setup Environment Variables
 
-Copy `.env.example` files and configure:
-
+**Backend:**
 ```bash
-# Backend
 cp apps/backend/.env.example apps/backend/.env
-
-# Frontend
-cp apps/frontend/.env.example apps/frontend/.env.local
 ```
 
 Edit `apps/backend/.env`:
@@ -62,15 +209,21 @@ JWT_SECRET="your-secret-key-change-in-production"
 JWT_REFRESH_SECRET="your-refresh-secret-key"
 ```
 
-### 3. Start Database (Docker)
+**Frontend:**
+```bash
+cp apps/frontend/.env.example apps/frontend/.env.local
+```
 
+### 4. Start Database
+
+Using Docker (recommended):
 ```bash
 docker-compose up -d
 ```
 
 Or use a local PostgreSQL instance (update `DATABASE_URL` accordingly).
 
-### 4. Run Database Migrations
+### 5. Run Database Migrations
 
 ```bash
 cd apps/backend
@@ -78,7 +231,7 @@ pnpm prisma migrate dev
 pnpm prisma generate
 ```
 
-### 5. Seed Sample Data
+### 6. Seed Sample Data
 
 ```bash
 cd apps/backend
@@ -86,13 +239,13 @@ pnpm prisma db seed
 ```
 
 This creates:
-- Admin user: `admin` / `admin123`
-- Employee user: `employee` / `employee123`
-- Sample products and categories
-- 4 games: Snooker, Table Tennis, PlayStation, Foosball
-- 2 tables per game (8 tables total), all in AVAILABLE status
+- ✅ Admin user: `admin` / `admin123`
+- ✅ Employee user: `employee` / `employee123`
+- ✅ Sample products and categories
+- ✅ 4 games: Snooker, Table Tennis, PlayStation, Foosball
+- ✅ 2 tables per game (8 tables total), all in AVAILABLE status
 
-### 6. Start Development
+### 7. Start Development
 
 From the root directory:
 
@@ -101,26 +254,211 @@ pnpm dev
 ```
 
 This starts:
-- Backend: http://localhost:3001
-- Frontend: http://localhost:3000
-- Electron: Launches automatically
+- 🔵 Backend: http://localhost:3001
+- 🟢 Frontend: http://localhost:3000
+- 🟡 Electron: Launches automatically
 
-## 📦 Project Structure
+---
+
+## 💻 Usage
+
+### Starting a Shift
+
+1. Click on **"Start Shift"** in the header
+2. Enter opening cash amount
+3. Click **"Start Shift"**
+
+### Managing Games
+
+1. Click **"Manage Games"** in the header
+2. Create new games with:
+   - Name (e.g., "Snooker", "Table Tennis")
+   - Description
+   - Rate Type (Per Minute or Per Hour)
+   - Default Rate
+3. Edit or delete existing games (only if no tables are linked)
+
+### Creating Tables
+
+1. Click **"Create Table"** button
+2. Select a game from the dropdown
+3. Enter table number
+4. Set rate per hour/minute (defaults to game's default rate)
+5. Click **"Create"**
+
+### Starting a Table Session
+
+1. **Prerequisite**: An active shift must be running
+2. Click on an available table card
+3. Enter rate per hour/minute (defaults to game's default rate)
+4. Click **"Start Table"**
+5. The table card will expand showing the timer and current charge
+
+### Adding Items to Cart
+
+1. While a table is active, click **"Canteen"** button
+2. Browse products and click to add to cart
+3. Adjust quantities as needed
+4. Items are automatically added to the current table's cart
+
+### Checkout
+
+1. Click **"Checkout"** on an active table
+2. Review table charges and cart items
+3. Optionally enable tax (15%) for:
+   - Table charge
+   - Canteen items
+   - Both
+4. Select payment method (Cash, Card, Mixed, Credit)
+5. Enter payment amount (for cash)
+6. Click **"Complete Sale"**
+7. Print receipt if needed
+
+### Closing a Shift
+
+1. **Prerequisite**: All tables must be closed (AVAILABLE status)
+2. Click **"Shift Closing Report"** in the header
+3. Review the shift report:
+   - Game-based revenue breakdown
+   - Canteen sales
+   - Tax breakdown
+   - Expenses
+   - Profit calculation
+4. Click **"Close Shift!"**
+5. Enter closing cash amount
+6. Review expected cash calculation:
+   - Opening Cash
+   - Cash Sales
+   - Expenses
+   - Expected Cash = Opening + Cash Sales - Expenses
+7. Add optional notes
+8. Click **"Confirm Close"**
+9. View success alert with cash discrepancy
+
+### Generating Reports
+
+1. Click **"Add-ons"** → **"Reporting"**
+2. Select date range
+3. Click **"Generate Report"**
+4. View detailed report with:
+   - Game-based revenue
+   - Canteen sales
+   - Tax breakdown
+   - Session counts
+5. Export to Excel or PDF
+
+---
+
+## 📁 Project Structure
 
 ```
 snooker-pos/
 ├── apps/
-│   ├── frontend/          # Next.js renderer
-│   ├── backend/           # NestJS API
-│   └── electron/          # Electron main process
+│   ├── frontend/              # Next.js frontend application
+│   │   ├── src/
+│   │   │   ├── app/          # Next.js app router pages
+│   │   │   ├── components/   # React components
+│   │   │   ├── lib/          # Utilities and API client
+│   │   │   └── store/        # Zustand state management
+│   │   └── package.json
+│   │
+│   ├── backend/               # NestJS backend API
+│   │   ├── src/
+│   │   │   ├── auth/         # Authentication module
+│   │   │   ├── games/        # Game management
+│   │   │   ├── tables/       # Table management
+│   │   │   ├── sales/        # Sales processing
+│   │   │   ├── shifts/       # Shift management
+│   │   │   ├── reports/      # Reporting
+│   │   │   ├── products/     # Product management
+│   │   │   └── ...
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma # Database schema
+│   │   │   ├── seed.ts       # Database seeder
+│   │   │   └── migrations/   # Database migrations
+│   │   └── package.json
+│   │
+│   └── electron/              # Electron desktop app
+│       ├── src/
+│       │   ├── main.ts       # Main process
+│       │   └── printer.ts    # Printer integration
+│       └── package.json
+│
 ├── packages/
-│   ├── shared/            # Shared TypeScript types
-│   └── ui/                # Shared MUI components
-├── docker-compose.yml
-└── package.json
+│   ├── shared/                # Shared TypeScript types
+│   └── ui/                    # Shared UI components
+│
+├── docker-compose.yml         # PostgreSQL Docker setup
+├── package.json               # Root package.json
+└── README.md                  # This file
 ```
 
-## 🛠️ Development Workflow
+---
+
+## 🔌 API Documentation
+
+### Authentication
+
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+### Games
+
+```http
+GET    /games              # List all games
+POST   /games              # Create new game
+PATCH  /games/:id          # Update game
+DELETE /games/:id          # Delete game (only if no tables linked)
+```
+
+### Tables
+
+```http
+GET    /tables             # List all tables (includes game info)
+POST   /tables             # Create new table (requires gameId)
+POST   /tables/:id/start   # Start table session (requires active shift)
+POST   /tables/:id/pause   # Pause table session
+POST   /tables/:id/resume  # Resume table session
+POST   /tables/:id/stop    # Stop table session
+DELETE /tables/:id         # Delete table
+DELETE /tables             # Delete all tables
+```
+
+### Sales
+
+```http
+POST /sales                # Create sale
+GET  /sales/:id            # Get sale details
+GET  /sales                # List sales with filters
+```
+
+### Shifts
+
+```http
+POST /shifts/start         # Start shift
+POST /shifts/:id/close     # Close shift (validates all tables closed)
+GET  /shifts               # List shifts
+GET  /shifts/:id/report    # Get shift report with game-based breakdown
+```
+
+### Reports
+
+```http
+GET /reports/daily?date=YYYY-MM-DD  # Daily sales report
+```
+
+For complete API documentation, see [API.md](./API.md) (if available).
+
+---
+
+## 🧪 Development
 
 ### Running Individual Services
 
@@ -146,173 +484,31 @@ pnpm prisma migrate dev --name migration_name
 # Reset database
 pnpm prisma migrate reset
 
-# Open Prisma Studio
+# Open Prisma Studio (database GUI)
 pnpm prisma studio
 
 # Generate Prisma client
 pnpm prisma generate
+
+# Clear all data
+pnpm prisma:clear
 ```
 
-### Testing Offline Sync
-
-1. Start the app in development
-2. Open DevTools and go to Application → IndexedDB → `snooker_pos_db`
-3. Make some offline changes (stop backend)
-4. Create sales/products while offline
-5. Check `sync_log` table in IndexedDB
-6. Restart backend and observe sync
-
-### Testing Printing
-
-1. Connect a USB thermal printer (or use a network printer)
-2. In Electron app, go to POS screen
-3. Create a sale and click "Print Receipt"
-4. Check Electron console for printer detection logs
-5. For development, you can test with virtual printers using CUPS
-
-## 📱 Key Features
-
-### POS Functionality
-- **Game Management**: Create and manage games (Snooker, Table Tennis, PlayStation, Foosball, etc.)
-- **Table Management**: Create/open/close tables linked to games with per-minute or per-hour billing
-- **Timer System**: Real-time table usage tracking with game-specific rate types
-- **Cart System**: Add items, apply discounts, optional tax calculation (15%)
-- **Payment Processing**: Cash and card payments with change calculation
-- **Receipt Printing**: ESC/POS thermal printer support and PDF receipts
-
-### Offline-First Architecture
-- **Local Database**: Dexie.js (IndexedDB) for offline operations
-- **Sync Queue**: Automatic sync on reconnect
-- **Conflict Resolution**: Last Writer Wins (LWW) with admin review UI
-- **Multi-terminal Support**: Multiple devices can sync independently
-
-### Inventory Management
-- **Product Management**: CRUD operations for canteen items
-- **Stock Tracking**: Inventory movements and adjustments
-- **Barcode Support**: USB scanner and camera scanning
-- **Low Stock Alerts**: Automatic notifications
-
-### Shift Management
-- **Shift Tracking**: Start/end shifts with employee assignment
-- **Cash Reconciliation**: Opening and closing cash tracking
-- **Shift Reports**: End-of-shift summaries with game-based revenue breakdown
-- **Validation**: Prevents closing shift if tables are still active
-
-### Reports & Analytics
-- **Daily Reports**: Sales summaries grouped by games, table usage, top products
-- **Shift Closing Reports**: Game-based revenue breakdown with session counts
-- **Custom Reports**: Date range reports with game-specific analytics
-- **Export**: Excel (XLSX) and PDF formats
-- **Activity Logs**: Audit trail for all operations
-
-## 🔐 Authentication & Security
-
-- **JWT Tokens**: Access and refresh tokens with HTTP-only cookies
-- **Role-Based Access**: ADMIN and EMPLOYEE roles
-- **Secure IPC**: Electron context isolation with preload scripts
-- **Input Validation**: DTO validation with class-validator
-
-## 📦 Packaging for macOS
-
-### Build Production
+### Testing
 
 ```bash
-# Build frontend and backend
-pnpm build
-
-# Package Electron app
-pnpm build:electron
-```
-
-This creates a `.app` bundle in `apps/electron/out/`.
-
-### Code Signing (Optional)
-
-For distribution, configure code signing in `apps/electron/electron-builder.yml`:
-
-```yaml
-mac:
-  identity: "Developer ID Application: Your Name (TEAM_ID)"
-```
-
-Then build with:
-
-```bash
-cd apps/electron
-pnpm build:electron
-```
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
+# Backend tests
 cd apps/backend
 pnpm test
 pnpm test:watch
 pnpm test:cov
-```
 
-### Frontend Tests
-
-```bash
+# Frontend tests
 cd apps/frontend
 pnpm test
 ```
 
-## 📝 API Documentation
-
-### Authentication
-
-- `POST /auth/login` - Login with username/password
-- `POST /auth/refresh` - Refresh access token
-- `POST /auth/logout` - Logout
-
-### Products
-
-- `GET /products` - List products (with `?since=ISO_DATE` for sync)
-- `POST /products` - Create product
-- `PATCH /products/:id` - Update product
-- `DELETE /products/:id` - Delete product
-
-### Sales
-
-- `POST /sales` - Create sale (append-only)
-- `GET /sales/:id` - Get sale details
-- `GET /sales` - List sales with filters
-
-### Sync
-
-- `POST /sync/push` - Push local changes to server
-- `GET /sync/pull?since=ISO_DATE` - Pull server changes
-
-### Games
-
-- `GET /games` - List all games
-- `POST /games` - Create new game
-- `PATCH /games/:id` - Update game
-- `DELETE /games/:id` - Delete game (only if no tables linked)
-
-### Tables
-
-- `GET /tables` - List all tables (includes game information)
-- `POST /tables` - Create new table (requires gameId)
-- `POST /tables/:id/start` - Start table session (requires active shift)
-- `POST /tables/:id/stop` - Stop table session
-- `DELETE /tables/:id` - Delete table
-- `DELETE /tables` - Delete all tables
-- `GET /tables/active` - Get active tables
-
-### Shifts
-
-- `POST /shifts/start` - Start shift
-- `POST /shifts/:id/close` - Close shift (validates all tables are closed)
-- `GET /shifts` - List shifts
-- `GET /shifts/:id/report` - Get shift report with game-based breakdown
-
-### Reports
-
-- `GET /reports/daily?date=YYYY-MM-DD` - Daily sales report
+---
 
 ## 🐛 Troubleshooting
 
@@ -324,9 +520,9 @@ pnpm test
 
 ### Printer Not Detected
 
-1. Check macOS System Preferences → Printers
+1. Check system printer settings
 2. Ensure printer driver is installed
-3. Test with `lpstat -p` in terminal
+3. Test with system print command
 4. Check Electron console for printer detection logs
 
 ### Sync Issues
@@ -336,11 +532,75 @@ pnpm test
 3. Check network tab for failed sync requests
 4. Review backend logs for conflict details
 
-## 📄 License
+### Shift Closing Issues
+
+- **Error: "Cannot close shift. There are X active table(s)"**
+  - Solution: Close all active tables before closing the shift
+
+- **Error: "Cannot delete game. There are X table(s) associated"**
+  - Solution: Delete or reassign all tables linked to the game first
+
+---
+
+## 📊 Database Schema
+
+### Key Models
+
+- **Game**: Games (Snooker, Table Tennis, etc.) with rate types
+- **Table**: Tables linked to games with status and timer tracking
+- **Sale**: Sales transactions with table and canteen items
+- **SaleItem**: Individual items in a sale with tax calculation
+- **Shift**: Shift tracking with cash reconciliation
+- **Product**: Canteen products with stock tracking
+- **Expense**: Expenses that reduce cash in drawer
+
+For complete schema, see `apps/backend/prisma/schema.prisma`.
+
+---
+
+## 🎨 UI/UX Features
+
+- **Modern Design**: Gradient backgrounds, glassmorphism effects, smooth animations
+- **Responsive Layout**: Works on different screen sizes
+- **Color-Coded Status**: Visual indicators for table status, payment methods, etc.
+- **Real-Time Updates**: Live timer updates and status changes
+- **Expandable Cards**: Tables collapse/expand for better organization
+- **Keyboard Support**: All numeric fields support keyboard input
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+
+---
+
+## 📝 License
 
 Proprietary - All rights reserved
+
+---
 
 ## 🤝 Contributing
 
 This is a proprietary project. Contact the development team for contribution guidelines.
 
+---
+
+## 📞 Support
+
+For issues, questions, or feature requests, please contact the development team.
+
+---
+
+## 🙏 Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- UI components from [Material UI](https://mui.com/)
+- Database management with [Prisma](https://www.prisma.io/)
+- Desktop app with [Electron](https://www.electronjs.org/)
+
+---
+
+<div align="center">
+
+**Made with ❤️ for Snooker Clubs**
+
+⭐ Star this repo if you find it helpful!
+
+</div>
