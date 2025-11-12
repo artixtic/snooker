@@ -35,6 +35,7 @@ export default function AdminProductsPage() {
     name: '',
     sku: '',
     price: '',
+    cost: '',
     stock: '',
     category: '',
     barcode: '',
@@ -87,6 +88,7 @@ export default function AdminProductsPage() {
         name: product.name,
         sku: product.sku || '',
         price: product.price.toString(),
+        cost: product.cost ? product.cost.toString() : '',
         stock: product.stock.toString(),
         category: product.category || '',
         barcode: product.barcode || '',
@@ -97,6 +99,7 @@ export default function AdminProductsPage() {
         name: '',
         sku: '',
         price: '',
+        cost: '',
         stock: '',
         category: '',
         barcode: '',
@@ -112,6 +115,7 @@ export default function AdminProductsPage() {
       name: '',
       sku: '',
       price: '',
+      cost: '',
       stock: '',
       category: '',
       barcode: '',
@@ -123,6 +127,7 @@ export default function AdminProductsPage() {
       name: formData.name,
       sku: formData.sku || undefined,
       price: parseFloat(formData.price),
+      cost: formData.cost ? parseFloat(formData.cost) : undefined,
       stock: parseInt(formData.stock),
       category: formData.category || undefined,
       barcode: formData.barcode || undefined,
@@ -158,7 +163,8 @@ export default function AdminProductsPage() {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>SKU</TableCell>
-              <TableCell>Price</TableCell>
+              <TableCell>Selling Price</TableCell>
+              <TableCell>Buying Rate</TableCell>
               <TableCell>Stock</TableCell>
               <TableCell>Category</TableCell>
               <TableCell>Barcode</TableCell>
@@ -170,7 +176,10 @@ export default function AdminProductsPage() {
               <TableRow key={product.id}>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.sku || '-'}</TableCell>
-                <TableCell>${Number(product.price).toFixed(2)}</TableCell>
+                <TableCell>PKR {Number(product.price).toFixed(2)}</TableCell>
+                <TableCell>
+                  {product.cost ? `PKR ${Number(product.cost).toFixed(2)}` : '-'}
+                </TableCell>
                 <TableCell>
                   <Chip
                     label={product.stock}
@@ -215,7 +224,7 @@ export default function AdminProductsPage() {
         </Table>
       </TableContainer>
 
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           {editingProduct ? 'Edit Product' : 'Add Product'}
         </DialogTitle>
@@ -235,12 +244,22 @@ export default function AdminProductsPage() {
               onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
             />
             <TextField
-              label="Price"
+              label="Selling Price"
               type="number"
               fullWidth
               required
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+              inputProps={{ min: 0, step: 0.01 }}
+            />
+            <TextField
+              label="Buying Rate (Cost)"
+              type="number"
+              fullWidth
+              value={formData.cost}
+              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+              inputProps={{ min: 0, step: 0.01 }}
+              helperText="Cost price for profit calculation"
             />
             <TextField
               label="Stock"

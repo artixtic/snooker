@@ -32,6 +32,7 @@ interface InventoryDialogProps {
 export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
   const [inventoryName, setInventoryName] = useState('');
   const [price, setPrice] = useState('');
+  const [cost, setCost] = useState('');
   const [quantity, setQuantity] = useState('');
   const queryClient = useQueryClient();
 
@@ -53,6 +54,7 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setInventoryName('');
       setPrice('');
+      setCost('');
       setQuantity('');
     },
   });
@@ -93,6 +95,7 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
         await createMutation.mutateAsync({
           name: inventoryName,
           price: parseFloat(price),
+          cost: cost ? parseFloat(cost) : undefined,
           stock: parseInt(quantity),
           category: 'Inventory',
         });
@@ -106,7 +109,7 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="md" 
+      maxWidth="lg" 
       fullWidth
       PaperProps={{
         sx: {
@@ -170,13 +173,35 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
               />
               <TextField
                 fullWidth
-                label="Price (PKR)"
+                label="Selling Price (PKR)"
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 margin="normal"
-                placeholder="Price"
-                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*' }}
+                placeholder="Selling Price"
+                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*', step: 0.01 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: '#2196F3',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#2196F3',
+                    },
+                  },
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Buying Rate (Cost) (PKR)"
+                type="number"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                margin="normal"
+                placeholder="Buying Rate"
+                inputProps={{ min: 0, inputMode: 'decimal', pattern: '[0-9.]*', step: 0.01 }}
+                helperText="Cost price for profit calculation"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
@@ -266,14 +291,15 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
                     <TableRow sx={{ bgcolor: 'rgba(33, 150, 243, 0.1)' }}>
                       <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>Inventory Name</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Price</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Selling Price</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Buying Price</TableCell>
                       <TableCell sx={{ fontWeight: 'bold' }}>Quantity (Edit to update)</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {inventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             📭 No inventory items yet
                           </Typography>
@@ -296,6 +322,9 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
                           <TableCell sx={{ fontWeight: 'medium' }}>{item.name}</TableCell>
                           <TableCell sx={{ fontWeight: 'bold', color: '#2196F3' }}>
                             PKR {Math.ceil(Number(item.price))}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', color: '#4CAF50' }}>
+                            {item.cost ? `PKR ${Math.ceil(Number(item.cost))}` : '-'}
                           </TableCell>
                           <TableCell>
                             <TextField

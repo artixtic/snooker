@@ -61,10 +61,11 @@ export class ShiftsService {
   }
 
   async start(employeeId: string, dto: StartShiftDto) {
-    // Check if there's an active shift
+    // Check if there's an active shift - if so, return it (idempotent)
     const activeShift = await this.findActive(employeeId);
     if (activeShift) {
-      throw new Error('Employee already has an active shift');
+      // Shift already active, return existing shift (idempotent behavior for queued requests)
+      return activeShift;
     }
 
     return this.prisma.shift.create({
@@ -226,8 +227,10 @@ export class ShiftsService {
       .filter((s) => s.paymentMethod === 'CARD')
       .reduce((sum, sale) => sum + Number(sale.total), 0);
 
-    // Top products
-    const productSales: Record<string, { product: any; quantity: number; revenue: number }> = {};
+    // Top products and calculate profit from product cost
+    const productSales: Record<string, { product: any; quantity: number; revenue: number; profit: number }> = {};
+    let totalProductProfit = 0;
+    
     sales.forEach((sale) => {
       sale.items.forEach((item) => {
         if (!productSales[item.productId]) {
@@ -235,10 +238,18 @@ export class ShiftsService {
             product: item.product,
             quantity: 0,
             revenue: 0,
+            profit: 0,
           };
         }
         productSales[item.productId].quantity += item.quantity;
         productSales[item.productId].revenue += Number(item.subtotal);
+        
+        // Calculate profit: (unitPrice - cost) * quantity
+        const unitPrice = Number(item.unitPrice);
+        const productCost = item.product?.cost ? Number(item.product.cost) : 0;
+        const itemProfit = (unitPrice - productCost) * item.quantity;
+        productSales[item.productId].profit += itemProfit;
+        totalProductProfit += itemProfit;
       });
     });
 
@@ -257,6 +268,9 @@ export class ShiftsService {
       },
     });
     const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    
+    // Total profit = Product profit - Expenses
+    const totalProfit = totalProductProfit - totalExpenses;
 
     return {
       shiftId: shift.id,
@@ -273,6 +287,8 @@ export class ShiftsService {
       canteenSalesWithTax,
       gameTotals: Object.values(gameTotals),
       totalExpenses,
+      totalProductProfit,
+      totalProfit,
       totalCash,
       totalCard,
       saleCount: sales.length,

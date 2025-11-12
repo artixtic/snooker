@@ -164,7 +164,8 @@ export default function AdminInventoryPage() {
               <TableCell>SKU</TableCell>
               <TableCell>Current Stock</TableCell>
               <TableCell>Category</TableCell>
-              <TableCell>Price</TableCell>
+              <TableCell>Selling Price</TableCell>
+              <TableCell>Buying Price</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -187,7 +188,10 @@ export default function AdminInventoryPage() {
                   />
                 </TableCell>
                 <TableCell>{product.category || '-'}</TableCell>
-                <TableCell>${Number(product.price).toFixed(2)}</TableCell>
+                <TableCell>PKR {Number(product.price).toFixed(2)}</TableCell>
+                <TableCell>
+                  {product.cost ? `PKR ${Number(product.cost).toFixed(2)}` : '-'}
+                </TableCell>
                 <TableCell align="right">
                   <IconButton
                     size="small"
@@ -214,7 +218,7 @@ export default function AdminInventoryPage() {
       <Dialog
         open={adjustmentDialogOpen}
         onClose={handleCloseAdjustmentDialog}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>

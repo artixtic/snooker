@@ -30,6 +30,7 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Avatar,
 } from '@mui/material';
 import {
   Add,
@@ -566,15 +567,26 @@ export default function DashboardPage() {
       const cachedTables = previousTables || [];
       const table = cachedTables.find((t: Table) => t.id === tableId);
       
-      if (table && table.status === 'OCCUPIED') {
+      if (table && table.status === 'OCCUPIED' && table.startedAt) {
         // Calculate current charge at pause time
-        const currentCharge = calculateCurrentCharge(table);
-        
-        // Apply optimistic update
-        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, currentCharge));
+        try {
+          const currentCharge = calculateCurrentCharge(table);
+          
+          // Apply optimistic update
+          const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
+          await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, currentCharge));
+        } catch (error) {
+          console.error('Error calculating charge for pause:', error);
+          // Still apply optimistic update without charge (will be calculated on backend)
+          const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
+          await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId));
+        }
         
         // Clear pending state immediately after optimistic update (for offline scenarios)
+        setPausingTableId(null);
+      } else if (table && table.status === 'OCCUPIED' && !table.startedAt) {
+        // Table is occupied but has no start time - this shouldn't happen, but handle gracefully
+        console.warn('Table is occupied but has no start time:', tableId);
         setPausingTableId(null);
       }
       
@@ -587,7 +599,10 @@ export default function DashboardPage() {
         console.log('📦 Pause request was queued, skipping query invalidation');
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Don't invalidate queries on successful pause - optimistic update already handled it
+      // Invalidating here causes flickering as it refetches and might show stale state
+      // The sync queue will invalidate after all queued requests are processed
+      console.log('✅ Pause successful, keeping optimistic update (no invalidation to prevent flickering)');
     },
     onError: (error: any, tableId: string, context: any) => {
       // Clear pending state
@@ -598,16 +613,32 @@ export default function DashboardPage() {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
       
+      // Get error message
+      const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error';
+      const errorMessageLower = errorMessage.toLowerCase();
+      
       // Suppress expected errors (table already paused or not occupied)
-      const errorMessage = error?.response?.data?.message || error?.message || '';
-      if (errorMessage.includes('not occupied') || errorMessage.includes('already paused') || errorMessage.includes('PAUSED')) {
+      if (errorMessageLower.includes('not occupied') || 
+          errorMessageLower.includes('already paused') || 
+          errorMessageLower.includes('paused') ||
+          errorMessageLower.includes('available') ||
+          errorMessageLower.includes('cannot pause')) {
         // Silently handle - table might have been paused by another request
         console.log('Table pause skipped:', errorMessage);
         // Invalidate to refresh state
         queryClient.invalidateQueries({ queryKey: ['tables'] });
-      } else {
-        console.error('Pause failed:', error);
+        return;
       }
+      
+      // Don't show alert for queued requests (offline scenario)
+      if (error?.code?.includes('ERR_NETWORK') || errorMessageLower.includes('queued')) {
+        console.log('Pause request queued for offline sync');
+        return;
+      }
+      
+      // Show alert for unexpected errors
+      console.error('Pause table error:', error);
+      alert(`⚠️ Failed to pause table: ${errorMessage}`);
     },
   });
 
@@ -622,12 +653,32 @@ export default function DashboardPage() {
         return table;
       }
       
-      const response = await api.post(`/tables/${tableId}/resume`);
+      // Send local pausedAt if available (for offline sync scenarios)
+      // This ensures the backend uses the actual pause time, not the sync time
+      const body = table?.pausedAt ? { pausedAt: table.pausedAt } : undefined;
+      const response = await api.post(`/tables/${tableId}/resume`, body);
       return response.data;
     },
     onMutate: async (tableId: string) => {
       setResumingTableId(tableId);
-      return {};
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      
+      // Snapshot previous value
+      const previousTables = queryClient.getQueryData<Table[]>(['tables']);
+      
+      // Get current table
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      if (table && table.status === 'PAUSED') {
+        // Apply optimistic update to immediately update status and totalPausedMs
+        const { applyOptimisticUpdate, createResumeTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createResumeTableUpdate(tableId));
+      }
+      
+      return { previousTables };
     },
     onSuccess: async (data) => {
       setResumingTableId(null);
@@ -636,10 +687,37 @@ export default function DashboardPage() {
         console.log('📦 Resume request was queued, skipping query invalidation');
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Don't invalidate queries on successful resume - optimistic update already handled it
+      // Invalidating here can cause flickering
+      // The sync queue will invalidate after all queued requests are processed
+      console.log('✅ Resume successful, keeping optimistic update (no invalidation to prevent flickering)');
     },
-    onError: (error: any) => {
+    onError: (error: any, tableId: string, context: any) => {
       setResumingTableId(null);
+      
+      // Rollback optimistic update on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      
+      // Suppress expected errors
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      const errorMessageLower = errorMessage.toLowerCase();
+      
+      if (errorMessageLower.includes('not paused') || 
+          errorMessageLower.includes('already occupied') || 
+          errorMessageLower.includes('occupied')) {
+        // Silently handle - table might have been resumed by another request
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+        return;
+      }
+      
+      // Don't show alert for queued requests (offline scenario)
+      if (error?.code?.includes('ERR_NETWORK') || errorMessageLower.includes('queued')) {
+        console.log('Resume request queued for offline sync');
+        return;
+      }
+      
       console.error('Resume failed:', error);
     },
   });
@@ -648,10 +726,9 @@ export default function DashboardPage() {
     if (!table.startedAt) return '00:00:00';
     
     const start = new Date(table.startedAt).getTime();
-    const now = currentTime; // Use client-side currentTime for smooth updates
     
     if (table.status === 'PAUSED' && table.pausedAt) {
-      // When paused, calculate up to the pause time
+      // When paused, calculate up to the pause time (use local pausedAt time)
       // totalPausedMs does NOT include the current pause yet (it will be added on resume)
       const pausedAt = new Date(table.pausedAt).getTime();
       const totalElapsed = pausedAt - start;
@@ -665,6 +742,7 @@ export default function DashboardPage() {
     } else if (table.status === 'OCCUPIED') {
       // When occupied, calculate from start minus all paused time
       // totalPausedMs contains all previous pauses (added when resuming)
+      const now = currentTime; // Use client-side currentTime for smooth updates
       const totalElapsed = now - start;
       const totalPausedMs = table.totalPausedMs || 0;
       const activeTime = Math.max(0, totalElapsed - totalPausedMs);
@@ -1220,9 +1298,60 @@ export default function DashboardPage() {
         boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
       }}>
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold', fontSize: '1.5rem', letterSpacing: 1 }}>
-            🎱 Smart Cue
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+            <Avatar
+              sx={{
+                width: { xs: 40, sm: 48, md: 56 },
+                height: { xs: 40, sm: 48, md: 56 },
+                background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 25%, #FFA07A 50%, #FFB347 75%, #FFD700 100%)',
+                boxShadow: '0 4px 20px rgba(255, 107, 107, 0.5), 0 0 30px rgba(255, 215, 0, 0.3)',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2rem' },
+                fontWeight: 'bold',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                  boxShadow: '0 6px 30px rgba(255, 107, 107, 0.7), 0 0 40px rgba(255, 215, 0, 0.5)',
+                }
+              }}
+            >
+              🎱
+            </Avatar>
+            <Typography 
+              variant="h5" 
+              component="div"
+              sx={{ 
+                fontWeight: 800, 
+                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.25rem' },
+                letterSpacing: { xs: 1, sm: 2, md: 3 },
+                background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 30%, #ffffff 60%, #e8eaf6 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                textShadow: '0 4px 8px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)',
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                position: 'relative',
+                display: 'inline-block',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-4px',
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent)',
+                  borderRadius: '2px',
+                },
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'scale(1.02)',
+                  filter: 'brightness(1.1)',
+                }
+              }}
+            >
+              Cue & Console
+            </Typography>
+          </Box>
           <Typography variant="body2" sx={{ mr: 2 }}>
             +92 316 1126671
           </Typography>
@@ -1418,11 +1547,16 @@ export default function DashboardPage() {
             variant="contained"
             size="small"
             startIcon={<Logout />} 
-            onClick={() => {
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
+            onClick={async () => {
+              const { clearAllData, isOffline } = await import('@/lib/logout-utils');
+              if (isOffline()) {
+                alert('⚠️ Cannot logout while offline. Please wait until you are online.');
+                return;
+              }
+              await clearAllData();
               window.location.href = '/login';
             }}
+            disabled={!navigator.onLine || (typeof window !== 'undefined' && (window as any).__forceOfflineMode === true)}
             sx={{
               py: 0.5,
               px: 1.5,
@@ -1432,6 +1566,10 @@ export default function DashboardPage() {
               '&:hover': {
                 background: 'linear-gradient(45deg, #E64A19 30%, #FF5722 90%)',
                 boxShadow: '0 6px 20px rgba(255, 87, 34, 0.6)',
+              },
+              '&:disabled': {
+                background: 'rgba(0, 0, 0, 0.12)',
+                color: 'rgba(0, 0, 0, 0.26)',
               }
             }}
           >
@@ -1761,7 +1899,7 @@ export default function DashboardPage() {
           setCreateTableDialogOpen(false);
           setSelectedGameId(''); // Reset game selection when dialog closes
         }} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: {
@@ -1881,7 +2019,7 @@ export default function DashboardPage() {
       <Dialog 
         open={deleteAllTablesDialogOpen} 
         onClose={() => setDeleteAllTablesDialogOpen(false)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: {
@@ -1966,7 +2104,7 @@ export default function DashboardPage() {
       <Dialog 
         open={startTableDialogOpen} 
         onClose={() => setStartTableDialogOpen(false)} 
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: {

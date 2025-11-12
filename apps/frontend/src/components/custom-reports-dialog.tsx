@@ -66,7 +66,8 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
   const canteenSalesWithTax = report?.canteenSalesWithTax || 0;
   const total = report?.totalSales || 0;
   const expense = report?.totalExpenses || 0;
-  const profit = total - expense;
+  const productProfit = report?.totalProductProfit || 0;
+  const profit = report?.totalProfit !== undefined ? report.totalProfit : (total - expense);
   const totalCash = report?.totalCash || 0;
   const totalCard = report?.totalCard || 0;
   const saleCount = report?.saleCount || 0;
@@ -78,7 +79,7 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="lg" 
+      maxWidth="xl" 
       fullWidth
       PaperProps={{
         sx: {
@@ -425,8 +426,23 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
                     <Table size="small">
                       <TableBody>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 'medium' }}>💸 Total Expenses</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800' }}>
+                          <TableCell colSpan={2} sx={{ pt: 1, pb: 1, fontWeight: 'bold', fontSize: '0.95rem', color: '#4CAF50' }}>
+                            💰 Profit Breakdown
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                            📦 Product Profit (Revenue - Cost)
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold', color: '#4CAF50', fontSize: '0.9rem' }}>
+                            PKR {Math.ceil(productProfit)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                            💸 Total Expenses
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.9rem' }}>
                             PKR {Math.ceil(expense)}
                           </TableCell>
                         </TableRow>

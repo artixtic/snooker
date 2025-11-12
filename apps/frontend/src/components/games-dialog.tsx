@@ -148,7 +148,7 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {

@@ -59,7 +59,7 @@ export function PaymentModal({ open, onClose, total, onComplete }: PaymentModalP
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Payment</DialogTitle>
       <DialogContent>
         <Box sx={{ mb: 3 }}>

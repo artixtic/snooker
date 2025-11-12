@@ -151,7 +151,8 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
   const canteenSalesWithTax = report?.canteenSalesWithTax || 0;
   const total = (report?.salesTotal || 0);
   const expense = report?.totalExpenses || 0;
-  const profit = total - expense;
+  const productProfit = report?.totalProductProfit || 0;
+  const profit = report?.totalProfit !== undefined ? report.totalProfit : (total - expense);
 
   const handleCloseDay = () => {
     if (!activeShift) {
@@ -197,7 +198,7 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="sm" 
+      maxWidth="md" 
       fullWidth
       PaperProps={{
         sx: {
@@ -347,13 +348,28 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'medium' }}>💸 Expenses</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800' }}>
+                <TableCell colSpan={2} sx={{ pt: 3, pb: 1, fontWeight: 'bold', fontSize: '1.05rem', color: '#4CAF50' }}>
+                  💰 Profit Breakdown
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                  📦 Product Profit (Revenue - Cost)
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#4CAF50', fontSize: '0.9rem' }}>
+                  PKR {Math.ceil(productProfit)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ pl: 4, fontWeight: 'medium', fontSize: '0.9rem' }}>
+                  💸 Expenses
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#FF9800', fontSize: '0.9rem' }}>
                   PKR {Math.ceil(expense)}
                 </TableCell>
               </TableRow>
               <TableRow sx={{ bgcolor: 'rgba(76, 175, 80, 0.1)' }}>
-                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>💰 Profit</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', fontSize: '1.05rem' }}>💰 Net Profit</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: '1.05rem', color: '#4CAF50' }}>
                   PKR {Math.ceil(profit)}
                 </TableCell>
@@ -408,7 +424,7 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       <Dialog 
         open={closingDialogOpen} 
         onClose={() => !closeShiftMutation.isPending && setClosingDialogOpen(false)}
-        maxWidth="sm" 
+        maxWidth="md" 
         fullWidth
         PaperProps={{
           sx: {

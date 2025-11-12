@@ -129,7 +129,7 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="sm" 
+      maxWidth="md" 
       fullWidth
       PaperProps={{
         sx: {

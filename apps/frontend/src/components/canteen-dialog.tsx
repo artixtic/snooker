@@ -156,7 +156,7 @@ export function CanteenDialog({ open, onClose, table, items: initialItems = [], 
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="sm" 
+      maxWidth="md" 
       fullWidth
       PaperProps={{
         sx: {
