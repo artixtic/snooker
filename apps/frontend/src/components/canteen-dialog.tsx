@@ -97,7 +97,7 @@ export function CanteenDialog({ open, onClose, table, items: initialItems = [], 
       const response = await api.get('/products');
       return response.data;
     },
-    enabled: open,
+    enabled: open && !!table,
   });
 
   const addItem = () => {

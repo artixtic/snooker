@@ -166,19 +166,41 @@ export class SalesService {
     return sale;
   }
 
-  private async generateReceiptNumber(tx?: any): Promise<string> {
+  private async generateReceiptNumber(tx?: any, retryCount: number = 0): Promise<string> {
     const prisma = tx || this.prisma;
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // Use timestamp component to ensure uniqueness even with concurrent requests
+    const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+    
+    // Count existing sales for today
+    const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(date.setHours(23, 59, 59, 999));
     const count = await prisma.sale.count({
       where: {
         createdAt: {
-          gte: new Date(date.setHours(0, 0, 0, 0)),
-          lt: new Date(date.setHours(23, 59, 59, 999)),
+          gte: startOfDay,
+          lt: endOfDay,
         },
       },
     });
-    return `RCP-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+    
+    // Combine count with timestamp for uniqueness
+    const receiptNumber = `RCP-${dateStr}-${String(count + 1).padStart(4, '0')}-${timestamp}`;
+    
+    // Check if receipt number already exists (shouldn't happen, but handle it)
+    const existing = await prisma.sale.findUnique({
+      where: { receiptNumber },
+    });
+    
+    if (existing && retryCount < 5) {
+      // If duplicate, retry with incremented timestamp
+      await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
+      return this.generateReceiptNumber(tx, retryCount + 1);
+    }
+    
+    return receiptNumber;
   }
 }
 

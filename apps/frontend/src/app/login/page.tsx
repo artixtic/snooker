@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Paper,
@@ -15,9 +15,19 @@ import api from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      const redirect = searchParams.get('redirect');
+      router.push(redirect && redirect !== '/login' ? redirect : '/dashboard');
+    }
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +42,10 @@ export default function LoginPage() {
         localStorage.setItem('userId', response.data.user.id);
       }
       
-      router.push('/dashboard');
+      // Redirect to the original page if redirect parameter exists, otherwise go to dashboard
+      const redirect = searchParams.get('redirect');
+      const redirectPath = redirect && redirect !== '/login' ? redirect : '/dashboard';
+      router.push(redirectPath);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
     }

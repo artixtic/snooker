@@ -58,21 +58,88 @@ export function TableTimer({
 
   const pauseTableMutation = useMutation({
     mutationFn: async () => {
+      // Check current table state before making request
+      const cachedTables = queryClient.getQueryData<any[]>(['tables']) || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      // If table is already paused, return early (idempotent)
+      if (table && table.status === 'PAUSED') {
+        return table;
+      }
+      
       const response = await api.post(`/tables/${tableId}/pause`, {});
       return response.data;
     },
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      
+      // Snapshot previous value
+      const previousTables = queryClient.getQueryData<any[]>(['tables']);
+      
+      // Get current table to calculate charge
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      if (table && table.status === 'OCCUPIED' && startedAt) {
+        // Calculate current charge at pause time
+        const start = new Date(startedAt).getTime();
+        const now = Date.now();
+        const totalElapsed = now - start;
+        const tableTotalPausedMs = table.totalPausedMs || 0;
+        const activeTime = totalElapsed - tableTotalPausedMs;
+        const hours = activeTime / (1000 * 60 * 60);
+        const calculatedCharge = hours * ratePerHour;
+        
+        // Apply optimistic update
+        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, calculatedCharge));
+      }
+      
+      return { previousTables };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any, variables: any, context: any) => {
+      // Rollback optimistic update on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      
+      // Suppress expected errors (table already paused or not occupied)
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not occupied') || errorMessage.includes('already paused') || errorMessage.includes('PAUSED')) {
+        // Silently handle - table might have been paused by another request
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      }
     },
   });
 
   const resumeTableMutation = useMutation({
     mutationFn: async () => {
+      // Check current table state before making request
+      const cachedTables = queryClient.getQueryData<any[]>(['tables']) || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      // If table is already occupied, return early (idempotent)
+      if (table && table.status === 'OCCUPIED') {
+        return table;
+      }
+      
       const response = await api.post(`/tables/${tableId}/resume`, {});
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any) => {
+      // Suppress expected errors (table already occupied or not paused)
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not paused') || errorMessage.includes('already occupied') || errorMessage.includes('OCCUPIED')) {
+        // Silently handle - table might have been resumed by another request
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      }
     },
   });
 
@@ -129,21 +196,37 @@ export function TableTimer({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleStart = () => {
-    startTableMutation.mutate({ ratePerHour: ratePerHour || 10 });
+  const handleStart = async () => {
+    try {
+      await startTableMutation.mutateAsync({ ratePerHour: ratePerHour || 10 });
+    } catch (error) {
+      console.error('Failed to start table:', error);
+    }
   };
 
-  const handlePause = () => {
-    pauseTableMutation.mutate();
+  const handlePause = async () => {
+    try {
+      await pauseTableMutation.mutateAsync();
+    } catch (error) {
+      console.error('Failed to pause table:', error);
+    }
   };
 
-  const handleResume = () => {
-    resumeTableMutation.mutate();
+  const handleResume = async () => {
+    try {
+      await resumeTableMutation.mutateAsync();
+    } catch (error) {
+      console.error('Failed to resume table:', error);
+    }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (confirm(`Stop table ${tableNumber}? Current charge: $${currentCharge.toFixed(2)}`)) {
-      stopTableMutation.mutate();
+      try {
+        await stopTableMutation.mutateAsync();
+      } catch (error) {
+        console.error('Failed to stop table:', error);
+      }
     }
   };
 

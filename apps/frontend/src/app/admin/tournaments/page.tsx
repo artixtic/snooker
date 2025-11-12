@@ -210,7 +210,13 @@ export default function TournamentsPage() {
                           size="small"
                           variant="contained"
                           startIcon={<PlayArrow />}
-                          onClick={() => startTournamentMutation.mutate(tournament.id)}
+                          onClick={async () => {
+                            try {
+                              await startTournamentMutation.mutateAsync(tournament.id);
+                            } catch (error) {
+                              console.error('Failed to start tournament:', error);
+                            }
+                          }}
                         >
                           Start
                         </Button>
@@ -252,7 +258,13 @@ export default function TournamentsPage() {
         <DialogTitle>Create Tournament</DialogTitle>
         <DialogContent>
           <CreateTournamentForm
-            onSubmit={(data) => createTournamentMutation.mutate(data)}
+            onSubmit={async (data) => {
+              try {
+                await createTournamentMutation.mutateAsync(data);
+              } catch (error) {
+                console.error('Failed to create tournament:', error);
+              }
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -269,9 +281,13 @@ export default function TournamentsPage() {
           {selectedTournament && (
             <AddParticipantForm
               users={users}
-              onSubmit={(data) =>
-                addParticipantMutation.mutate({ id: selectedTournament.id, data })
-              }
+              onSubmit={async (data) => {
+                try {
+                  await addParticipantMutation.mutateAsync({ id: selectedTournament.id, data });
+                } catch (error) {
+                  console.error('Failed to add participant:', error);
+                }
+              }}
             />
           )}
         </DialogContent>

@@ -27,8 +27,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { addToSyncQueue } from '@/lib/sync';
 
 export default function AdminProductsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -46,36 +44,15 @@ export default function AdminProductsPage() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products');
-        await db.products.bulkPut(response.data);
-        return response.data;
-      } catch (error) {
-        return db.products.where('deleted').equals(false).toArray();
-      }
+      const response = await api.get('/products');
+      return response.data;
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      try {
-        const response = await api.post('/products', data);
-        return response.data;
-      } catch (error: any) {
-        if (!navigator.onLine) {
-          const localProduct = {
-            ...data,
-            id: `local_${Date.now()}`,
-            deleted: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          await db.products.add(localProduct);
-          await addToSyncQueue('product', 'create', localProduct.id, data);
-          return localProduct;
-        }
-        throw error;
-      }
+      const response = await api.post('/products', data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -85,17 +62,8 @@ export default function AdminProductsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      try {
-        const response = await api.patch(`/products/${id}`, data);
-        return response.data;
-      } catch (error: any) {
-        if (!navigator.onLine) {
-          await db.products.update(id, data);
-          await addToSyncQueue('product', 'update', id, { id, ...data });
-          return { id, ...data };
-        }
-        throw error;
-      }
+      const response = await api.patch(`/products/${id}`, data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -105,16 +73,7 @@ export default function AdminProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await api.delete(`/products/${id}`);
-      } catch (error: any) {
-        if (!navigator.onLine) {
-          await db.products.update(id, { deleted: true });
-          await addToSyncQueue('product', 'delete', id, { id });
-        } else {
-          throw error;
-        }
-      }
+      await api.delete(`/products/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -169,10 +128,14 @@ export default function AdminProductsPage() {
       barcode: formData.barcode || undefined,
     };
 
-    if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data });
-    } else {
-      createMutation.mutate(data);
+    try {
+      if (editingProduct) {
+        await updateMutation.mutateAsync({ id: editingProduct.id, data });
+      } else {
+        await createMutation.mutateAsync(data);
+      }
+    } catch (error) {
+      console.error('Failed to save product:', error);
     }
   };
 
@@ -233,9 +196,13 @@ export default function AdminProductsPage() {
                   <IconButton
                     size="small"
                     color="error"
-                    onClick={() => {
+                    onClick={async () => {
                       if (confirm('Delete this product?')) {
-                        deleteMutation.mutate(product.id);
+                        try {
+                          await deleteMutation.mutateAsync(product.id);
+                        } catch (error) {
+                          console.error('Failed to delete product:', error);
+                        }
                       }
                     }}
                   >

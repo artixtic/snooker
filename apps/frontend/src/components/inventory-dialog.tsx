@@ -59,7 +59,27 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
 
   const updateQuantityMutation = useMutation({
     mutationFn: async ({ id, stock }: { id: string; stock: number }) => {
+      const product = inventory.find((p: any) => p.id === id);
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      
+      const oldStock = product.stock || 0;
+      const stockChange = stock - oldStock;
+      
       const response = await api.patch(`/products/${id}`, { stock });
+      
+      // Create inventory movement
+      try {
+        await api.post('/inventory/movements', {
+          productId: id,
+          change: stockChange,
+          reason: 'MANUAL_ADJUSTMENT',
+        });
+      } catch {
+        // Movement creation failed, but product update succeeded
+      }
+      
       return response.data;
     },
     onSuccess: () => {
@@ -67,14 +87,18 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (inventoryName && price && quantity) {
-      createMutation.mutate({
-        name: inventoryName,
-        price: parseFloat(price),
-        stock: parseInt(quantity),
-        category: 'Inventory',
-      });
+      try {
+        await createMutation.mutateAsync({
+          name: inventoryName,
+          price: parseFloat(price),
+          stock: parseInt(quantity),
+          category: 'Inventory',
+        });
+      } catch (error) {
+        console.error('Failed to create inventory item:', error);
+      }
     }
   };
 
@@ -278,12 +302,16 @@ export function InventoryDialog({ open, onClose }: InventoryDialogProps) {
                               size="small"
                               type="number"
                               value={item.stock || 0}
-                              onChange={(e) =>
-                                updateQuantityMutation.mutate({
-                                  id: item.id,
-                                  stock: parseInt(e.target.value) || 0,
-                                })
-                              }
+                              onChange={async (e) => {
+                                try {
+                                  await updateQuantityMutation.mutateAsync({
+                                    id: item.id,
+                                    stock: parseInt(e.target.value) || 0,
+                                  });
+                                } catch (error) {
+                                  console.error('Failed to update quantity:', error);
+                                }
+                              }}
                               disabled={updateQuantityMutation.isPending}
                               inputProps={{ min: 0, inputMode: 'numeric', pattern: '[0-9]*' }}
                               sx={{ 

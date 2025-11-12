@@ -56,10 +56,12 @@ export class AuthService {
   async login(user: any) {
     const payload = { username: user.username, sub: user.id, role: user.role };
 
+    // Access token never expires
     const accessToken = this.jwtService.sign(payload);
+    // Refresh token also never expires
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+      // No expiration
     });
 
     // Log activity
@@ -86,8 +88,10 @@ export class AuthService {
 
   async refreshToken(refreshToken: string) {
     try {
+      // Verify token but ignore expiration since tokens never expire
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
+        ignoreExpiration: true,
       });
 
       const user = await this.usersService.findById(payload.sub);
@@ -96,6 +100,7 @@ export class AuthService {
       }
 
       const newPayload = { username: user.username, sub: user.id, role: user.role };
+      // New access token also never expires
       const accessToken = this.jwtService.sign(newPayload);
 
       return { accessToken };

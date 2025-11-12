@@ -126,14 +126,18 @@ export default function AdminUsersPage() {
       data.password = formData.password;
     }
 
-    if (editingUser) {
-      updateMutation.mutate({ id: editingUser.id, data });
-    } else {
-      if (!formData.password) {
-        alert('Password is required for new users');
-        return;
+    try {
+      if (editingUser) {
+        await updateMutation.mutateAsync({ id: editingUser.id, data });
+      } else {
+        if (!formData.password) {
+          alert('Password is required for new users');
+          return;
+        }
+        await createMutation.mutateAsync(data);
       }
-      createMutation.mutate(data);
+    } catch (error) {
+      console.error('Failed to save user:', error);
     }
   };
 
@@ -190,13 +194,17 @@ export default function AdminUsersPage() {
                   <IconButton
                     size="small"
                     color="error"
-                    onClick={() => {
+                    onClick={async () => {
                       if (
                         confirm(
                           `Are you sure you want to delete user "${user.username}"?`,
                         )
                       ) {
-                        deleteMutation.mutate(user.id);
+                        try {
+                          await deleteMutation.mutateAsync(user.id);
+                        } catch (error) {
+                          console.error('Failed to delete user:', error);
+                        }
                       }
                     }}
                   >

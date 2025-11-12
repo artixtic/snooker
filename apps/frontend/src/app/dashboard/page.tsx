@@ -44,10 +44,9 @@ import {
   PlayArrow,
   ExpandMore,
   ExpandLess,
+  ShoppingCart,
 } from '@mui/icons-material';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { addToSyncQueue } from '@/lib/sync';
 import { TableHistoryDialog } from '@/components/table-history-dialog';
 import { InventoryDialog } from '@/components/inventory-dialog';
 import { CanteenDialog } from '@/components/canteen-dialog';
@@ -56,7 +55,9 @@ import { ReportsDialog } from '@/components/reports-dialog';
 import { CustomReportsDialog } from '@/components/custom-reports-dialog';
 import { ShiftModal } from '@/components/shift-modal';
 import { GamesDialog } from '@/components/games-dialog';
-import { OfflineIndicator } from '@/components/offline-indicator';
+import { InventorySaleDialog } from '@/components/inventory-sale-dialog';
+import { SyncStatus } from '@/components/sync-status';
+import { dataCache, CACHE_KEYS } from '@/lib/data-cache';
 
 interface Table {
   id: string;
@@ -79,6 +80,9 @@ interface CartItem {
 
 export default function DashboardPage() {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [pausingTableId, setPausingTableId] = useState<string | null>(null);
+  const [resumingTableId, setResumingTableId] = useState<string | null>(null);
+  const [startingTableId, setStartingTableId] = useState<string | null>(null);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [inventoryDialogOpen, setInventoryDialogOpen] = useState(false);
@@ -91,6 +95,7 @@ export default function DashboardPage() {
   const [createTableDialogOpen, setCreateTableDialogOpen] = useState(false);
   const [deleteAllTablesDialogOpen, setDeleteAllTablesDialogOpen] = useState(false);
   const [gamesDialogOpen, setGamesDialogOpen] = useState(false);
+  const [inventorySaleDialogOpen, setInventorySaleDialogOpen] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState(1);
   const [selectedGameId, setSelectedGameId] = useState<string>('');
   const [ratePerMinute, setRatePerMinute] = useState(8); // Default rate: 8 PKR/min
@@ -102,28 +107,58 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
 
   // Fetch games
-  const { data: games = [], isLoading: gamesLoading } = useQuery({
+  // Note: AuthGuard in layout handles authentication, but we still handle 401 errors from API calls
+  const { data: games = [], isLoading: gamesLoading, isError: gamesError, error: gamesErrorObj } = useQuery({
     queryKey: ['games'],
     queryFn: async () => {
       const response = await api.get('/games');
       return response.data;
     },
+    initialData: () => dataCache.get(CACHE_KEYS.GAMES) || undefined,
+    retry: false, // Don't retry - fail fast
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    onError: (error: any) => {
+      // API interceptor handles 401 redirects, but log other errors
+      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+        console.error('Games query error:', error);
+      }
+    },
   });
 
   // Fetch tables
-  const { data: tables = [], isLoading: tablesLoading } = useQuery({
+  const { data: tables = [], isLoading: tablesLoading, isError: tablesError, error: tablesErrorObj } = useQuery({
     queryKey: ['tables'],
     queryFn: async () => {
       const response = await api.get('/tables');
       return response.data;
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for data sync
+    initialData: () => dataCache.get(CACHE_KEYS.TABLES) || undefined,
+    refetchInterval: (query) => {
+      // Only refetch if not in error state (API interceptor handles 401 redirects)
+      return !query.state.error ? 5000 : false;
+    },
+    retry: false, // Don't retry - fail fast
+    staleTime: 5000, // Consider data fresh for 5 seconds
+    onError: (error: any) => {
+      // API interceptor handles 401 redirects, but log other errors
+      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+        console.error('Tables query error:', error);
+      }
+    },
+  });
+  
+  // Only show loading if we're actually loading (not in error state)
+  const isLoading = (gamesLoading || tablesLoading) && !gamesError && !tablesError;
+
+  // Sort games by createdAt (oldest first)
+  const sortedGames = [...games].sort((a: any, b: any) => {
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dateA - dateB; // Ascending order (oldest first)
   });
 
-  const isLoading = gamesLoading || tablesLoading;
-
   // Group tables by game
-  const tablesByGame = games.reduce((acc: Record<string, any[]>, game: any) => {
+  const tablesByGame = sortedGames.reduce((acc: Record<string, any[]>, game: any) => {
     acc[game.id] = tables.filter((table: any) => table.gameId === game.id);
     return acc;
   }, {});
@@ -132,25 +167,15 @@ export default function DashboardPage() {
   const { data: shifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
-      // If offline, check local DB first
-      if (!navigator.onLine) {
-        const localShifts = await db.shifts.toArray();
-        return localShifts;
-      }
-      
-      try {
-        const response = await api.get('/shifts');
-        const serverShifts = response.data;
-        
-        // Cache in local DB
-        for (const shift of serverShifts) {
-          await db.shifts.put(shift);
-        }
-        
-        return serverShifts;
-      } catch {
-        // Fallback to local DB on error
-        return await db.shifts.toArray();
+      const response = await api.get('/shifts');
+      return response.data;
+    },
+    initialData: () => dataCache.get(CACHE_KEYS.SHIFTS) || undefined,
+    retry: false, // Don't retry - fail fast
+    onError: (error: any) => {
+      // API interceptor handles 401 redirects, but log other errors
+      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+        console.error('Shifts query error:', error);
       }
     },
   });
@@ -176,21 +201,81 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
+
+
+  // Start table mutation with optimistic updates
   const startTableMutation = useMutation({
-    mutationFn: async ({ tableId, ratePerMinute }: { tableId: string; ratePerMinute: number }) => {
-      const response = await api.post(`/tables/${tableId}/start`, { ratePerHour: ratePerMinute }); // Backend still expects ratePerHour but it's actually per minute
+    mutationFn: async ({ tableId, ratePerHour }: { tableId: string; ratePerHour: number }) => {
+      const response = await api.post(`/tables/${tableId}/start`, { ratePerHour });
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    onMutate: async ({ tableId, ratePerHour }) => {
+      setStartingTableId(tableId);
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      
+      // Snapshot previous value
+      const previousTables = queryClient.getQueryData<Table[]>(['tables']);
+      
+      // Get current table
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      if (table && table.status === 'AVAILABLE') {
+        // Apply optimistic update to table (set to OCCUPIED)
+        const { applyOptimisticUpdate, createStartTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createStartTableUpdate(tableId, ratePerHour));
+      }
+      
+      // Close dialog immediately (optimistic)
       setStartTableDialogOpen(false);
-      setRatePerMinute(8); // Reset to default
+      setRatePerMinute(8);
+      setStartingTableId(null); // Clear immediately after optimistic update
+      
+      return { previousTables };
     },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.message || 'Failed to start table. Please try again.';
-      alert(`⚠️ ${errorMessage}`);
+    onSuccess: async (data, variables) => {
+      setStartingTableId(null);
+      
+      // Only invalidate if this is NOT a queued request (queued requests are handled by sync queue)
+      // Check if the response indicates it was queued
+      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
+        // This was queued, don't invalidate yet - wait for sync queue to complete
+        console.log('📦 Start request was queued, skipping query invalidation (will sync later)');
+        return;
+      }
+      // For successful online requests, invalidate to refresh
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any, variables, context: any) => {
+      setStartingTableId(null);
+      
+      // Rollback optimistic update on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      
+      // Restore dialog state
+      setStartTableDialogOpen(true);
+      
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to start table. Please try again.';
+      // Don't show alert for queued requests (offline scenario)
+      if (!errorMessage.includes('queued') && !error?.code?.includes('ERR_NETWORK')) {
+        alert(`⚠️ ${errorMessage}`);
+      }
     },
   });
+
+  // Simple async function wrapper for backward compatibility
+  const startTable = async (tableId: string, ratePerMinute: number) => {
+    try {
+      await startTableMutation.mutateAsync({ tableId, ratePerHour: ratePerMinute });
+    } catch (error) {
+      // Error handling is done in the mutation
+      throw error;
+    }
+  };
 
   const stopTableMutation = useMutation({
     mutationFn: async ({ tableId, paymentAmount, cartItems, skipSale, taxEnabled = true }: { tableId: string; paymentAmount: number; cartItems?: CartItem[]; skipSale?: boolean; taxEnabled?: boolean }) => {
@@ -199,10 +284,13 @@ export default function DashboardPage() {
         throw new Error('Table not found');
       }
       
-      const isOnline = navigator.onLine;
-      
       // Calculate totals (rounded up to integers)
-      const tableCharge = Math.ceil(Number(table.currentCharge) || 0);
+      // Use currentCharge if available (preserved when paused), otherwise calculate it
+      let tableCharge = Math.ceil(Number(table.currentCharge) || 0);
+      if (tableCharge === 0 && table.status === 'OCCUPIED' && table.startedAt) {
+        // If charge is 0 but table is occupied, calculate it
+        tableCharge = Math.ceil(calculateCurrentCharge(table));
+      }
       const cartItemsTotal = Math.ceil(cartItems?.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0) || 0);
       const subtotal = tableCharge + cartItemsTotal;
       // Calculate tax on both table charge and cart items (rounded up)
@@ -211,151 +299,181 @@ export default function DashboardPage() {
       const tax = tableTax + cartTax; // Total tax on both table and cart items
       const total = Math.ceil(subtotal + tax);
       
-      let tableResponse: any;
-      
-      // Stop the table - try online first, fallback to offline
-      if (isOnline) {
-        try {
-          tableResponse = await api.post('/tables/' + tableId + '/stop', {
-            paymentAmount,
-          });
-          // Save to local DB
-          if (tableResponse.data) {
-            await db.tables.put({ ...tableResponse.data, id: tableId });
-          }
-        } catch (error: any) {
-          if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-            // Offline: update local table state
-            const updatedTable = {
-              ...table,
-              status: 'AVAILABLE' as const,
-              currentCharge: 0,
-              startedAt: null,
-              pausedAt: null,
-              totalPausedTime: 0,
-              lastResumedAt: null,
-            };
-            await db.tables.put({ ...updatedTable, id: tableId });
-            tableResponse = { data: updatedTable };
-            // Queue for sync
-            await addToSyncQueue('table', 'update', tableId, {
-              status: 'AVAILABLE',
-              currentCharge: 0,
-            });
-          } else {
-            throw error;
-          }
-        }
-      } else {
-        // Offline: update local table state
-        const updatedTable = {
-          ...table,
-          status: 'AVAILABLE' as const,
-          currentCharge: 0,
-          startedAt: null,
-          pausedAt: null,
-          totalPausedTime: 0,
-          lastResumedAt: null,
-        };
-        await db.tables.put({ ...updatedTable, id: tableId });
-        tableResponse = { data: updatedTable };
-        // Queue for sync
-        await addToSyncQueue('table', 'update', tableId, {
-          status: 'AVAILABLE',
-          currentCharge: 0,
-        });
-      }
-      
-        // Create sale for table charge + cart items (unless skipSale is true)
-        if (!skipSale && total > 0) {
-          // Format cart items for sale - ensure all numeric values are rounded up
-          const saleItems = cartItems?.map(item => {
-            const unitPrice = Math.ceil(Number(item.price));
-            const quantity = Number(item.quantity);
-            const itemSubtotal = Math.ceil(unitPrice * quantity);
-            const itemTax = taxEnabled ? Math.ceil(itemSubtotal * 0.15) : 0; // Tax only if enabled
-            
-            return {
-              productId: item.productId,
-              quantity: quantity,
-              unitPrice: unitPrice,
-              discount: 0,
-              tax: itemTax > 0 ? itemTax : undefined, // Only include if > 0
-              subtotal: itemSubtotal,
-            };
-          }) || [];
-          
-          const saleData = {
-            tableId,
-            subtotal: subtotal,
-            tax: tax > 0 ? tax : undefined, // Only include tax if enabled and > 0
-            total: total,
-            paymentMethod: 'CASH',
-            cashReceived: Math.ceil(Number(paymentAmount)),
-            change: Math.ceil(Math.max(0, paymentAmount - total)),
-            items: saleItems,
-          };
-          
-          if (isOnline) {
-            try {
-              const saleResponse = await api.post('/sales', saleData);
-              // Save to local DB
-              if (saleResponse.data) {
-                await db.sales.put({ ...saleResponse.data, synced: true });
-              }
-            } catch (error: any) {
-              if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-                // Offline: save to local DB and queue for sync
-                const localSaleId = `local_sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                const localSale = {
-                  ...saleData,
-                  id: localSaleId,
-                  createdAt: new Date().toISOString(),
-                  synced: false,
-                };
-                await db.sales.put(localSale);
-                await addToSyncQueue('sale', 'create', localSaleId, saleData);
-              } else {
-                throw error;
-              }
-            }
-          } else {
-            // Offline: save to local DB and queue for sync
-            const localSaleId = `local_sale_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const localSale = {
-              ...saleData,
-              id: localSaleId,
-              createdAt: new Date().toISOString(),
-              synced: false,
-            };
-            await db.sales.put(localSale);
-            await addToSyncQueue('sale', 'create', localSaleId, saleData);
-          }
-        }
-      
-      return { tableResponse: tableResponse.data, tableId };
-    },
-    onSuccess: (data) => {
-      // Clear cart items for this table after successful checkout
-      setTableCartItems(prev => {
-        const updated = { ...prev };
-        delete updated[data.tableId];
-        return updated;
+      // Stop the table
+      const tableResponse = await api.post('/tables/' + tableId + '/stop', {
+        paymentAmount,
       });
       
-      // Close dialog and clear selected table
-      setCheckoutDialogOpen(false);
-      setSelectedTable(null);
+      // Create sale for table charge + cart items (unless skipSale is true)
+      if (!skipSale && total > 0) {
+        // Format cart items for sale - ensure all numeric values are rounded up
+        const saleItems = cartItems?.map(item => {
+          const unitPrice = Math.ceil(Number(item.price));
+          const quantity = Number(item.quantity);
+          const itemSubtotal = Math.ceil(unitPrice * quantity);
+          const itemTax = taxEnabled ? Math.ceil(itemSubtotal * 0.15) : 0; // Tax only if enabled
+          
+          return {
+            productId: item.productId,
+            quantity: quantity,
+            unitPrice: unitPrice,
+            discount: 0,
+            tax: itemTax > 0 ? itemTax : undefined, // Only include if > 0
+            subtotal: itemSubtotal,
+          };
+        }) || [];
+        
+        const saleData = {
+          tableId,
+          subtotal: subtotal,
+          tax: tax > 0 ? tax : undefined, // Only include tax if enabled and > 0
+          total: total,
+          paymentMethod: 'CASH',
+          cashReceived: Math.ceil(Number(paymentAmount)),
+          change: Math.ceil(Math.max(0, paymentAmount - total)),
+          items: saleItems,
+        };
+        
+        await api.post('/sales', saleData);
+      }
       
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] }); // Refresh product stock
+      return { tableResponse: tableResponse.data, tableId, total, skipSale };
     },
-    onError: (error: any) => {
+    onMutate: async ({ tableId, paymentAmount, cartItems, skipSale, taxEnabled = true }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      await queryClient.cancelQueries({ queryKey: ['sales'] });
+      
+      // Snapshot previous values
+      const previousTables = queryClient.getQueryData<Table[]>(['tables']);
+      const previousSales = queryClient.getQueryData<any[]>(['sales']);
+      const previousCartItems = tableCartItems[tableId] || [];
+      const previousSelectedTable = selectedTable;
+      const previousDialogOpen = checkoutDialogOpen;
+      
+      // Get current table
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      if (table) {
+        // Clear cart items immediately (optimistic)
+        setTableCartItems(prev => {
+          const updated = { ...prev };
+          delete updated[tableId];
+          return updated;
+        });
+        
+        // Close dialog immediately (optimistic)
+        setCheckoutDialogOpen(false);
+        setSelectedTable(null);
+        
+        // Apply optimistic update to table (set to AVAILABLE)
+        const { applyOptimisticUpdate, createStopTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createStopTableUpdate(tableId));
+        
+        // If creating a sale, add optimistic sale update
+        if (!skipSale) {
+          // Calculate totals for optimistic sale
+          let tableCharge = Math.ceil(Number(table.currentCharge) || 0);
+          if (tableCharge === 0 && table.status === 'OCCUPIED' && table.startedAt) {
+            tableCharge = Math.ceil(calculateCurrentCharge(table));
+          }
+          const cartItemsTotal = Math.ceil(cartItems?.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0) || 0);
+          const subtotal = tableCharge + cartItemsTotal;
+          const tableTax = taxEnabled ? Math.ceil(tableCharge * 0.15) : 0;
+          const cartTax = taxEnabled ? Math.ceil(cartItemsTotal * 0.15) : 0;
+          const tax = tableTax + cartTax;
+          const total = Math.ceil(subtotal + tax);
+          
+          // Create optimistic sale
+          const optimisticSale = {
+            id: `temp-${Date.now()}`,
+            tableId,
+            subtotal,
+            tax: tax > 0 ? tax : undefined,
+            total,
+            paymentMethod: 'CASH' as const,
+            cashReceived: Math.ceil(Number(paymentAmount)),
+            change: Math.ceil(Math.max(0, paymentAmount - total)),
+            items: cartItems?.map(item => ({
+              productId: item.productId,
+              quantity: Number(item.quantity),
+              unitPrice: Math.ceil(Number(item.price)),
+              discount: 0,
+              tax: taxEnabled ? Math.ceil(Math.ceil(Number(item.price)) * Number(item.quantity) * 0.15) : undefined,
+              subtotal: Math.ceil(Number(item.price) * Number(item.quantity)),
+            })) || [],
+            createdAt: new Date().toISOString(),
+          };
+          
+          // Apply optimistic sale update to React Query cache
+          queryClient.setQueryData<any[]>(['sales'], (oldSales = []) => [...oldSales, optimisticSale]);
+          
+          // Also save to IndexedDB for offline persistence
+          const { storage } = await import('@/lib/db/storage');
+          const currentSales = queryClient.getQueryData<any[]>(['sales']) || [];
+          await storage.sales.saveAll(currentSales);
+        }
+      }
+      
+      return { previousTables, previousSales, previousCartItems, previousSelectedTable, previousDialogOpen, tableId };
+    },
+    onSuccess: async (data) => {
+      // Skip invalidation for queued requests (handled by sync queue)
+      // Note: For checkout, the optimistic update already handles UI updates
+      // The queued response will have { queued: true } but data.tableId might not exist
+      const isQueued = data && typeof data === 'object' && 'queued' in data && (data as any).queued === true;
+      
+      if (!isQueued) {
+        // Only clear cart and close dialog for immediate (non-queued) requests
+        // For queued requests, this is already done in onMutate
+        if (data?.tableId) {
+          setTableCartItems(prev => {
+            const updated = { ...prev };
+            delete updated[data.tableId];
+            return updated;
+          });
+          
+          setCheckoutDialogOpen(false);
+          setSelectedTable(null);
+        }
+        
+        await queryClient.invalidateQueries({ queryKey: ['tables'] });
+        await queryClient.invalidateQueries({ queryKey: ['sales'] });
+        await queryClient.invalidateQueries({ queryKey: ['products'] });
+      } else {
+        console.log('📦 Checkout request was queued, skipping query invalidation');
+      }
+    },
+    onError: (error: any, variables, context: any) => {
+      // Rollback optimistic updates on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      if (context?.previousSales) {
+        queryClient.setQueryData(['sales'], context.previousSales);
+      }
+      
+      // Restore cart items and dialog state
+      if (context?.tableId && context?.previousCartItems) {
+        setTableCartItems(prev => ({
+          ...prev,
+          [context.tableId]: context.previousCartItems,
+        }));
+      }
+      if (context?.previousSelectedTable) {
+        setSelectedTable(context.previousSelectedTable);
+      }
+      if (context?.previousDialogOpen !== undefined) {
+        setCheckoutDialogOpen(context.previousDialogOpen);
+      }
+      
       console.error('Checkout failed:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Checkout failed. Please try again.';
-      alert(Array.isArray(errorMessage) ? errorMessage.join('\n') : errorMessage);
+      // Don't show alert for queued requests (offline scenario)
+      if (!errorMessage.includes('queued') && !error?.code?.includes('ERR_NETWORK')) {
+        alert(Array.isArray(errorMessage) ? errorMessage.join('\n') : errorMessage);
+      }
     },
   });
 
@@ -417,23 +535,112 @@ export default function DashboardPage() {
 
   const pauseTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
+      // Check current table state before making request
+      const cachedTables = queryClient.getQueryData<Table[]>(['tables']) || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      // If table is already paused, return early (idempotent)
+      if (table && table.status === 'PAUSED') {
+        return table;
+      }
+      
+      // If table is not occupied, throw a more descriptive error
+      if (table && table.status !== 'OCCUPIED') {
+        throw new Error(`Table is ${table.status.toLowerCase()}, cannot pause`);
+      }
+      
       const response = await api.post(`/tables/${tableId}/pause`);
       return response.data;
     },
-    onSuccess: async (data, tableId) => {
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
-      // Refetch to get updated table with currentCharge
-      await queryClient.refetchQueries({ queryKey: ['tables'] });
+    onMutate: async (tableId: string) => {
+      // Set this table as pausing
+      setPausingTableId(tableId);
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      
+      // Snapshot previous value
+      const previousTables = queryClient.getQueryData<Table[]>(['tables']);
+      
+      // Get current table to calculate charge
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      if (table && table.status === 'OCCUPIED') {
+        // Calculate current charge at pause time
+        const currentCharge = calculateCurrentCharge(table);
+        
+        // Apply optimistic update
+        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, currentCharge));
+        
+        // Clear pending state immediately after optimistic update (for offline scenarios)
+        setPausingTableId(null);
+      }
+      
+      return { previousTables };
+    },
+    onSuccess: async (data) => {
+      setPausingTableId(null);
+      // Skip invalidation for queued requests (handled by sync queue)
+      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
+        console.log('📦 Pause request was queued, skipping query invalidation');
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any, tableId: string, context: any) => {
+      // Clear pending state
+      setPausingTableId(null);
+      
+      // Rollback optimistic update on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      
+      // Suppress expected errors (table already paused or not occupied)
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not occupied') || errorMessage.includes('already paused') || errorMessage.includes('PAUSED')) {
+        // Silently handle - table might have been paused by another request
+        console.log('Table pause skipped:', errorMessage);
+        // Invalidate to refresh state
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      } else {
+        console.error('Pause failed:', error);
+      }
     },
   });
 
   const resumeTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
+      // Check current table state
+      const cachedTables = queryClient.getQueryData<Table[]>(['tables']) || [];
+      const table = cachedTables.find((t: Table) => t.id === tableId);
+      
+      // If table is already occupied, return early (idempotent)
+      if (table && table.status === 'OCCUPIED') {
+        return table;
+      }
+      
       const response = await api.post(`/tables/${tableId}/resume`);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    onMutate: async (tableId: string) => {
+      setResumingTableId(tableId);
+      return {};
+    },
+    onSuccess: async (data) => {
+      setResumingTableId(null);
+      // Skip invalidation for queued requests (handled by sync queue)
+      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
+        console.log('📦 Resume request was queued, skipping query invalidation');
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any) => {
+      setResumingTableId(null);
+      console.error('Resume failed:', error);
     },
   });
 
@@ -516,6 +723,7 @@ export default function DashboardPage() {
 
   // Helper function to render table card
   const renderTableCard = (table: Table, game: any, gameTableNumber: number) => {
+    // For Kanban board, we want full-width cards, not grid items
     const elapsedTime = calculateElapsedTime(table);
     const currentCharge = Number(calculateCurrentCharge(table));
     const isOccupied = table.status === 'OCCUPIED' || table.status === 'PAUSED';
@@ -546,22 +754,23 @@ export default function DashboardPage() {
     const rateValue = table.ratePerHour ? Number(table.ratePerHour) : (game?.defaultRate || (table as any).game?.defaultRate || 8);
 
     return (
-      <Grid item xs={12} sm={6} md={4} lg={3} key={table.id}>
-        <Card
-          sx={{
-            background: getCardGradient(),
-            color: 'white',
-            borderRadius: 3,
-            position: 'relative',
-            minHeight: isExpanded ? 'auto' : 180,
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-8px)',
-              boxShadow: '0 15px 50px rgba(0, 0, 0, 0.3)',
-            }
-          }}
-        >
+      <Card
+        key={table.id}
+        sx={{
+          background: getCardGradient(),
+          color: 'white',
+          borderRadius: 2,
+          position: 'relative',
+          minHeight: isExpanded ? 'auto' : 160,
+          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+          transition: 'all 0.2s ease',
+          width: '100%',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+          }
+        }}
+      >
           <CardContent>
             <Box 
               display="flex" 
@@ -585,10 +794,14 @@ export default function DashboardPage() {
                 {table.status === 'AVAILABLE' && (
                   <IconButton
                     size="small"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       if (confirm(`Delete ${gameName} ${gameTableNumber}?`)) {
-                        deleteTableMutation.mutate({ tableId: table.id });
+                        try {
+                          await deleteTableMutation.mutateAsync({ tableId: table.id });
+                        } catch (error) {
+                          console.error('Failed to delete table:', error);
+                        }
                       }
                     }}
                     sx={{ 
@@ -731,8 +944,22 @@ export default function DashboardPage() {
                       variant="contained"
                       size="small"
                       startIcon={<Pause />}
-                      onClick={() => pauseTableMutation.mutate(table.id)}
-                      disabled={pauseTableMutation.isPending}
+                      onClick={async () => {
+                        // Double-check status before making request
+                        if (table.status !== 'OCCUPIED') {
+                          return;
+                        }
+                        try {
+                          await pauseTableMutation.mutateAsync(table.id);
+                        } catch (error: any) {
+                          // Only show alert for unexpected errors
+                          const errorMessage = error?.response?.data?.message || error?.message || '';
+                          if (!errorMessage.includes('not occupied') && !errorMessage.includes('already paused')) {
+                            alert('Failed to pause table. Please try again.');
+                          }
+                        }
+                      }}
+                      disabled={(pausingTableId === table.id) || table.status !== 'OCCUPIED'}
                       fullWidth
                       sx={{ 
                         background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
@@ -745,15 +972,24 @@ export default function DashboardPage() {
                         }
                       }}
                     >
-                      Pause
+                      {pausingTableId === table.id ? 'Pausing...' : 'Pause'}
                     </Button>
                   ) : table.status === 'PAUSED' ? (
                     <Button
                       variant="contained"
                       size="small"
                       startIcon={<PlayArrow />}
-                      onClick={() => resumeTableMutation.mutate(table.id)}
-                      disabled={resumeTableMutation.isPending}
+                      onClick={async () => {
+                        try {
+                          console.log('🖱️ Resume button clicked for table:', table.id);
+                          await resumeTableMutation.mutateAsync(table.id);
+                          console.log('✅ Resume mutation completed');
+                        } catch (error) {
+                          console.error('❌ Resume failed:', error);
+                          alert('Failed to resume table. Please try again.');
+                        }
+                      }}
+                      disabled={resumingTableId === table.id}
                       fullWidth
                       sx={{ 
                         background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
@@ -766,7 +1002,7 @@ export default function DashboardPage() {
                         }
                       }}
                     >
-                      Resume
+                      {resumingTableId === table.id ? 'Resuming...' : 'Resume'}
                     </Button>
                   ) : null}
                 </Box>
@@ -782,22 +1018,37 @@ export default function DashboardPage() {
                       } else if (table.status === 'OCCUPIED') {
                         // Pause first, then open checkout
                         try {
-                          await pauseTableMutation.mutateAsync(table.id);
-                          // Wait for refetch to complete
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                          const updatedTables = await queryClient.fetchQuery({ queryKey: ['tables'] });
-                          const updatedTable = (updatedTables as Table[]).find((t: Table) => t.id === table.id);
+                          const result = await pauseTableMutation.mutateAsync(table.id);
+                          // Use the result directly from the mutation (works offline)
+                          if (result && result.status === 'PAUSED') {
+                            setSelectedTable(result as Table);
+                            setCheckoutDialogOpen(true);
+                          } else {
+                            // Fallback: get from cache
+                            const cachedTables = queryClient.getQueryData<Table[]>(['tables']) || [];
+                            const updatedTable = cachedTables.find((t: Table) => t.id === table.id);
+                            if (updatedTable && updatedTable.status === 'PAUSED') {
+                              setSelectedTable(updatedTable);
+                              setCheckoutDialogOpen(true);
+                            }
+                          }
+                        } catch (error: any) {
+                          // Check if table is already paused (might have been paused by another request)
+                          const cachedTables = queryClient.getQueryData<Table[]>(['tables']) || [];
+                          const updatedTable = cachedTables.find((t: Table) => t.id === table.id);
                           if (updatedTable && updatedTable.status === 'PAUSED') {
                             setSelectedTable(updatedTable);
                             setCheckoutDialogOpen(true);
+                          } else {
+                            const errorMessage = error?.response?.data?.message || error?.message || '';
+                            if (!errorMessage.includes('not occupied') && !errorMessage.includes('already paused')) {
+                              alert('Failed to pause table. Please try again.');
+                            }
                           }
-                        } catch (error) {
-                          console.error('Failed to pause table:', error);
-                          alert('Failed to pause table. Please try again.');
                         }
                       }
                     }}
-                    disabled={pauseTableMutation.isPending || table.status === 'AVAILABLE'}
+                    disabled={(pausingTableId === table.id) || table.status === 'AVAILABLE'}
                     sx={{ 
                       background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
                       color: 'white',
@@ -818,9 +1069,13 @@ export default function DashboardPage() {
                   <Button
                     variant="contained"
                     size="small"
-                    onClick={() => {
+                    onClick={async () => {
                       if (confirm(`Reset ${gameName} ${gameTableNumber}? This will clear all data without creating a sale.`)) {
-                        resetTableMutation.mutate({ tableId: table.id });
+                        try {
+                          await resetTableMutation.mutateAsync({ tableId: table.id });
+                        } catch (error) {
+                          console.error('Failed to reset table:', error);
+                        }
                       }
                     }}
                     sx={{ 
@@ -943,10 +1198,11 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </Grid>
     );
   };
 
+  // Show loading only if we're actually loading
+  // Note: AuthGuard handles authentication, API interceptor handles 401 redirects
   if (isLoading) {
     return (
       <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -954,6 +1210,7 @@ export default function DashboardPage() {
       </Container>
     );
   }
+
 
   return (
     <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
@@ -969,7 +1226,6 @@ export default function DashboardPage() {
           <Typography variant="body2" sx={{ mr: 2 }}>
             +92 316 1126671
           </Typography>
-          <OfflineIndicator compact />
           {!activeShift && (
             <Button
               variant="contained"
@@ -1103,6 +1359,26 @@ export default function DashboardPage() {
           <Button 
             variant="contained"
             size="small"
+            startIcon={<ShoppingCart />}
+            onClick={() => setInventorySaleDialogOpen(true)} 
+            sx={{ 
+              mr: 1,
+              py: 0.5,
+              px: 1.5,
+              fontSize: '0.85rem',
+              background: 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)',
+              boxShadow: '0 4px 15px rgba(255, 152, 0, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #F57C00 30%, #FF9800 90%)',
+                boxShadow: '0 6px 20px rgba(255, 152, 0, 0.6)',
+              }
+            }}
+          >
+            Inventory Sale
+          </Button>
+          <Button 
+            variant="contained"
+            size="small"
             onClick={() => setExpenseDialogOpen(true)} 
             sx={{ 
               mr: 1,
@@ -1200,97 +1476,188 @@ export default function DashboardPage() {
         </MenuItem>
       </Menu>
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        {/* Render games with their tables */}
-        {games.map((game: any) => {
-          const gameTables = tablesByGame[game.id] || [];
-          if (gameTables.length === 0) return null; // Don't show games with no tables
-          
-          return (
-            <Box key={`game-${game.id}`} sx={{ mb: 4 }}>
+      <Container maxWidth={false} sx={{ py: 4, px: 3, width: '100%', maxWidth: '100%' }}>
+        {/* Sync Status Indicator */}
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <SyncStatus />
+        </Box>
+        {/* Kanban Board Layout - Games as Columns */}
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 2,
+            overflowX: 'auto',
+            pb: 2,
+            minHeight: 'calc(100vh - 200px)',
+            width: '100%',
+            '&::-webkit-scrollbar': {
+              height: 8,
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'rgba(0, 0, 0, 0.1)',
+              borderRadius: 4,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: 'rgba(102, 126, 234, 0.5)',
+              borderRadius: 4,
+              '&:hover': {
+                background: 'rgba(102, 126, 234, 0.7)',
+              },
+            },
+          }}
+        >
+          {sortedGames.map((game: any) => {
+            const gameTables = tablesByGame[game.id] || [];
+            
+            return (
               <Box
+                key={`game-${game.id}`}
                 sx={{
-                  mb: 2,
-                  p: 2.5,
+                  minWidth: 350,
+                  maxWidth: 350,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: 'fit-content',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
                   borderRadius: 3,
-                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
-                  border: '2px solid rgba(102, 126, 234, 0.4)',
-                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.2)',
+                  p: 1.5,
+                  border: '1px solid rgba(102, 126, 234, 0.1)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
                 }}
               >
-                <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                  <Typography variant="h4" fontWeight="bold" sx={{ 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}>
-                    🎮 {game.name}
-                  </Typography>
-                  <Chip 
-                    label={game.rateType === 'PER_HOUR' ? 'Per Hour' : 'Per Minute'} 
-                    size="small" 
-                    sx={{ 
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      background: game.rateType === 'PER_HOUR' 
-                        ? 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)'
-                        : 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
-                      color: 'white',
-                    }}
-                  />
-                  {game.description && (
-                    <Typography variant="body2" sx={{ opacity: 0.8, flex: 1 }}>
-                      {game.description}
+                {/* Game Column Header */}
+                <Box
+                  sx={{
+                    mb: 1.5,
+                    p: 1.5,
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%)',
+                    border: '2px solid rgba(102, 126, 234, 0.4)',
+                    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.2)',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
+                  <Box display="flex" flexDirection="column" gap={0.5}>
+                    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                      <Typography variant="h5" fontWeight="bold" sx={{ 
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        fontSize: '1.1rem',
+                      }}>
+                        🎮 {game.name}
+                      </Typography>
+                      <Chip 
+                        label={game.rateType === 'PER_HOUR' ? 'Per Hour' : 'Per Minute'} 
+                        size="small" 
+                        sx={{ 
+                          fontSize: '0.65rem',
+                          fontWeight: 'bold',
+                          height: 20,
+                          background: game.rateType === 'PER_HOUR' 
+                            ? 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)'
+                            : 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                          color: 'white',
+                        }}
+                      />
+                    </Box>
+                    {game.description && (
+                      <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem', lineHeight: 1.2 }}>
+                        {game.description}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" sx={{ opacity: 0.7, fontWeight: 'bold', fontSize: '0.7rem' }}>
+                      {gameTables.length} table{gameTables.length !== 1 ? 's' : ''}
                     </Typography>
-                  )}
+                  </Box>
+                </Box>
+                
+                {/* Tables Column - Scrollable */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                    flex: 1,
+                    minHeight: 150,
+                    maxHeight: 'calc(100vh - 280px)',
+                    overflowY: 'auto',
+                    pr: 0.5,
+                    borderRadius: 2,
+                    '&::-webkit-scrollbar': {
+                      width: 6,
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: 'rgba(0, 0, 0, 0.05)',
+                      borderRadius: 3,
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: 'rgba(102, 126, 234, 0.3)',
+                      borderRadius: 3,
+                      '&:hover': {
+                        background: 'rgba(102, 126, 234, 0.5)',
+                      },
+                    },
+                  }}
+                >
+                  {/* Table Cards - Always render first */}
+                  {gameTables.map((table: Table, index: number) => {
+                    return (
+                      <Box key={table.id} sx={{ width: '100%' }}>
+                        {renderTableCard(table, game, index + 1)}
+                      </Box>
+                    );
+                  })}
+                  
+                  {/* Create Table Card - Always at the end, even if no tables exist */}
+                  <Card
+                    sx={{
+                      background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                      color: 'white',
+                      borderRadius: 2,
+                      minHeight: 100,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(17, 153, 142, 0.3)',
+                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      border: '2px dashed rgba(255, 255, 255, 0.3)',
+                      width: '100%',
+                      mt: 'auto', // Push to bottom
+                      '&:hover': {
+                        transform: 'translateY(-4px) scale(1.02)',
+                        boxShadow: '0 8px 25px rgba(17, 153, 142, 0.5)',
+                        background: 'linear-gradient(135deg, #38ef7d 0%, #11998e 100%)',
+                        border: '2px dashed rgba(255, 255, 255, 0.5)',
+                      },
+                    }}
+                    onClick={() => {
+                      // Find the next available table number for this game
+                      const gameTableNumbers = gameTables.map((t: Table) => t.tableNumber);
+                      const maxTableNumber = gameTableNumbers.length > 0 
+                        ? Math.max(...gameTableNumbers)
+                        : 0;
+                      setNewTableNumber(maxTableNumber + 1);
+                      setSelectedGameId(game.id); // Pre-select this game
+                      setCreateTableDialogOpen(true);
+                    }}
+                  >
+                    <CardContent sx={{ textAlign: 'center', py: 1.5, px: 2 }}>
+                      <Add sx={{ fontSize: 28, mb: 0.5, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                      <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.85rem' }}>
+                        Create Table
+                      </Typography>
+                    </CardContent>
+                  </Card>
                 </Box>
               </Box>
-              <Grid container spacing={3}>
-                {gameTables.map((table: Table, index: number) => {
-                  return renderTableCard(table, game, index + 1);
-                })}
-              </Grid>
-            </Box>
-          );
-        })}
-
-        {/* Create Table Card - moved outside game sections */}
-        <Grid container spacing={3} sx={{ mt: 2 }}>
-          <Grid item xs={12} sm={6} md={4} lg={3}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                color: 'white',
-                borderRadius: 3,
-                minHeight: 180,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 10px 40px rgba(17, 153, 142, 0.3)',
-                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-8px) scale(1.02)',
-                  boxShadow: '0 15px 50px rgba(17, 153, 142, 0.5)',
-                  background: 'linear-gradient(135deg, #38ef7d 0%, #11998e 100%)',
-                },
-              }}
-              onClick={() => {
-                // Find the next available table number
-                const maxTableNumber = tables.length > 0 
-                  ? Math.max(...tables.map((t: Table) => t.tableNumber))
-                  : 0;
-                setNewTableNumber(maxTableNumber + 1);
-                setCreateTableDialogOpen(true);
-              }}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Add sx={{ fontSize: 40, mb: 1, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }} />
-                <Typography variant="h6" fontWeight="bold">Create Table</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+            );
+          })}
+        </Box>
       </Container>
 
       {/* Checkout Dialog */}
@@ -1304,16 +1671,20 @@ export default function DashboardPage() {
         }}
         table={selectedTable}
         cartItems={selectedTable ? (tableCartItems[selectedTable.id] || []) : []}
-        onCheckout={(amount, skipSale, taxEnabled = true) => {
+        onCheckout={async (amount, skipSale, taxEnabled = true) => {
           if (selectedTable) {
             const tableId = selectedTable.id;
-            stopTableMutation.mutate({ 
-              tableId, 
-              paymentAmount: amount,
-              cartItems: tableCartItems[tableId] || [],
-              skipSale: skipSale || false,
-              taxEnabled: taxEnabled,
-            });
+            try {
+              await stopTableMutation.mutateAsync({ 
+                tableId, 
+                paymentAmount: amount,
+                cartItems: tableCartItems[tableId] || [],
+                skipSale: skipSale || false,
+                taxEnabled: taxEnabled,
+              });
+            } catch (error) {
+              console.error('Checkout failed:', error);
+            }
           }
         }}
       />
@@ -1353,6 +1724,11 @@ export default function DashboardPage() {
         onClose={() => setExpenseDialogOpen(false)}
       />
 
+      <InventorySaleDialog
+        open={inventorySaleDialogOpen}
+        onClose={() => setInventorySaleDialogOpen(false)}
+      />
+
       {/* Reports Dialog (Daily Closing) */}
       <ReportsDialog
         open={reportsDialogOpen}
@@ -1381,7 +1757,10 @@ export default function DashboardPage() {
       {/* Create Table Dialog */}
       <Dialog 
         open={createTableDialogOpen} 
-        onClose={() => setCreateTableDialogOpen(false)} 
+        onClose={() => {
+          setCreateTableDialogOpen(false);
+          setSelectedGameId(''); // Reset game selection when dialog closes
+        }} 
         maxWidth="sm" 
         fullWidth
         PaperProps={{
@@ -1448,7 +1827,10 @@ export default function DashboardPage() {
         </DialogContent>
         <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
           <Button 
-            onClick={() => setCreateTableDialogOpen(false)}
+            onClick={() => {
+              setCreateTableDialogOpen(false);
+              setSelectedGameId(''); // Reset game selection when canceling
+            }}
             sx={{
               borderRadius: 2,
               px: 3,
@@ -1463,10 +1845,15 @@ export default function DashboardPage() {
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
+            onClick={async () => {
               if (newTableNumber > 0 && selectedGameId) {
-                createTableMutation.mutate({ tableNumber: newTableNumber, gameId: selectedGameId });
-                setSelectedGameId(''); // Reset after creation
+                try {
+                  await createTableMutation.mutateAsync({ tableNumber: newTableNumber, gameId: selectedGameId });
+                  // Keep the game selected for creating more tables
+                  // setSelectedGameId(''); // Don't reset - allow creating multiple tables for same game
+                } catch (error) {
+                  console.error('Failed to create table:', error);
+                }
               }
             }}
             disabled={createTableMutation.isPending || newTableNumber <= 0 || !selectedGameId}
@@ -1547,7 +1934,13 @@ export default function DashboardPage() {
           </Button>
           <Button
             variant="contained"
-            onClick={() => deleteAllTablesMutation.mutate()}
+            onClick={async () => {
+              try {
+                await deleteAllTablesMutation.mutateAsync();
+              } catch (error) {
+                console.error('Failed to delete all tables:', error);
+              }
+            }}
             disabled={deleteAllTablesMutation.isPending}
             sx={{
               borderRadius: 2,
@@ -1648,20 +2041,17 @@ export default function DashboardPage() {
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
+            onClick={async () => {
               if (!activeShift) {
                 alert('⚠️ Please start a shift first before checking in a table!');
                 setStartTableDialogOpen(false);
                 return;
               }
               if (selectedTable) {
-                startTableMutation.mutate({
-                  tableId: selectedTable.id,
-                  ratePerMinute: ratePerMinute || 8,
-                });
+                await startTable(selectedTable.id, ratePerMinute || 8);
               }
             }}
-            disabled={startTableMutation.isPending || ratePerMinute <= 0 || !activeShift}
+            disabled={(startingTableId === selectedTable?.id) || ratePerMinute <= 0 || !activeShift}
             sx={{
               borderRadius: 2,
               px: 4,
@@ -1680,7 +2070,7 @@ export default function DashboardPage() {
               },
             }}
           >
-            {startTableMutation.isPending 
+            {(startingTableId === selectedTable?.id)
               ? 'Starting...' 
               : !activeShift 
                 ? '⚠️ Start Shift First' 
@@ -1694,7 +2084,7 @@ export default function DashboardPage() {
 }
 
 // Checkout Dialog Component
-function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [], games = [], tables = [] }: { open: boolean; onClose: () => void; table: Table | null; onCheckout: (amount: number, skipSale?: boolean, taxEnabled?: boolean) => void; cartItems?: CartItem[]; games?: any[]; tables?: any[] }) {
+function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [], games = [], tables = [] }: { open: boolean; onClose: () => void; table: Table | null; onCheckout: (amount: number, skipSale?: boolean, taxEnabled?: boolean) => Promise<void>; cartItems?: CartItem[]; games?: any[]; tables?: any[] }) {
   const [amount, setAmount] = useState(0);
   const [frozenCharge, setFrozenCharge] = useState(0);
   const [taxEnabled, setTaxEnabled] = useState(true); // Default to enabled
@@ -1990,9 +2380,9 @@ function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [], game
         </Button>
         <Button 
           variant="contained" 
-          onClick={() => {
+          onClick={async () => {
             if (totalCharge > 0 && amount >= totalCharge && table.status === 'PAUSED') {
-              onCheckout(amount, false, taxEnabled);
+              await onCheckout(amount, false, taxEnabled);
             }
           }}
           disabled={(totalCharge > 0 && amount < totalCharge) || table.status !== 'PAUSED'}

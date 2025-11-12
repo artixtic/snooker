@@ -4,8 +4,8 @@
   "description": "Electron main process for Snooker POS",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsc && electron dist/main.js",
-    "build": "tsc",
+    "dev": "tsc && tsc -p preload/tsconfig.json && electron dist/main.js",
+    "build": "tsc && tsc -p preload/tsconfig.json",
     "build:electron": "electron-builder",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"

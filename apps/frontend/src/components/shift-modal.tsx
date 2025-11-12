@@ -16,8 +16,6 @@ import {
 } from '@mui/material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { addToSyncQueue } from '@/lib/sync';
 
 interface ShiftModalProps {
   open: boolean;
@@ -37,27 +35,8 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     queryKey: ['shift', shiftId],
     queryFn: async () => {
       if (!shiftId) return null;
-      
-      // If offline, check local DB first
-      if (!navigator.onLine) {
-        const localShift = await db.shifts.get(shiftId);
-        return localShift || null;
-      }
-      
-      try {
-        const response = await api.get(`/shifts/${shiftId}`);
-        const shiftData = response.data;
-        
-        // Cache in local DB
-        if (shiftData) {
-          await db.shifts.put(shiftData);
-        }
-        
-        return shiftData;
-      } catch {
-        // Fallback to local DB on error
-        return await db.shifts.get(shiftId) || null;
-      }
+      const response = await api.get(`/shifts/${shiftId}`);
+      return response.data;
     },
     enabled: mode === 'close' && !!shiftId,
   });
@@ -69,28 +48,8 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     queryKey: ['shifts', 'active', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return null;
-      
-      // If offline, check local DB first
-      if (!navigator.onLine) {
-        const localShifts = await db.shifts.where('status').equals('ACTIVE').toArray();
-        return localShifts.find((s: any) => s.employeeId === currentUserId) || null;
-      }
-      
-      try {
-        const response = await api.get('/shifts');
-        const serverShift = response.data.find((s: any) => s.status === 'ACTIVE' && s.employeeId === currentUserId);
-        
-        // Also cache in local DB
-        if (serverShift) {
-          await db.shifts.put(serverShift);
-        }
-        
-        return serverShift || null;
-      } catch {
-        // Fallback to local DB on error
-        const localShifts = await db.shifts.where('status').equals('ACTIVE').toArray();
-        return localShifts.find((s: any) => s.employeeId === currentUserId) || null;
-      }
+      const response = await api.get('/shifts');
+      return response.data.find((s: any) => s.status === 'ACTIVE' && s.employeeId === currentUserId) || null;
     },
     enabled: mode === 'start' && !!currentUserId,
   });
@@ -101,49 +60,8 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
       if (!currentUserId) {
         throw new Error('User ID not found');
       }
-
-      // If online, try to create on server
-      if (navigator.onLine) {
-        try {
-          const response = await api.post('/shifts/start', data);
-          const shift = response.data;
-          
-          // Save to local DB
-          await db.shifts.put(shift);
-          
-          return shift;
-        } catch (error: any) {
-          // If error and we're still online, throw it
-          if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED') {
-            throw error;
-          }
-          // Fall through to offline handling
-        }
-      }
-
-      // Offline: create locally
-      const localShiftId = `local_shift_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const localShift = {
-        id: localShiftId,
-        employeeId: currentUserId,
-        openingCash: data.openingCash,
-        status: 'ACTIVE',
-        startedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Save to local DB
-      await db.shifts.add(localShift);
-
-      // Queue for sync
-      await addToSyncQueue('shift', 'create', localShiftId, {
-        employeeId: currentUserId,
-        openingCash: data.openingCash,
-        status: 'ACTIVE',
-      });
-
-      return localShift;
+      const response = await api.post('/shifts/start', data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -175,22 +93,30 @@ export function ShiftModal({ open, onClose, mode, shiftId }: ShiftModalProps) {
     }
   }, [mode, shift]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (mode === 'start') {
       if (!openingCash || parseFloat(openingCash) < 0) {
         alert('Please enter a valid opening cash amount');
         return;
       }
-      startMutation.mutate({ openingCash: parseFloat(openingCash) });
+      try {
+        await startMutation.mutateAsync({ openingCash: parseFloat(openingCash) });
+      } catch (error) {
+        console.error('Failed to start shift:', error);
+      }
     } else {
       if (!closingCash || parseFloat(closingCash) < 0) {
         alert('Please enter a valid closing cash amount');
         return;
       }
-      closeMutation.mutate({
-        closingCash: parseFloat(closingCash),
-        notes: notes || undefined,
-      });
+      try {
+        await closeMutation.mutateAsync({
+          closingCash: parseFloat(closingCash),
+          notes: notes || undefined,
+        });
+      } catch (error) {
+        console.error('Failed to close shift:', error);
+      }
     }
   };
 

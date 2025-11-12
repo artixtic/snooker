@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"app\\\\dashboard\\\\page.tsx -> @/lib/db/storage\":{\"id\":\"app\\\\dashboard\\\\page.tsx -> @/lib/db/storage\",\"files\":[]},\"app\\\\dashboard\\\\page.tsx -> @/lib/offline/optimistic-updates\":{\"id\":\"app\\\\dashboard\\\\page.tsx -> @/lib/offline/optimistic-updates\",\"files\":[\"static/chunks/_app-pages-browser_src_lib_offline_optimistic-updates_ts.js\"]}}"

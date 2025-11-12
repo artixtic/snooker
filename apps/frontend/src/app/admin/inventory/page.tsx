@@ -30,8 +30,6 @@ import AddIcon from '@mui/icons-material/Add';
 import HistoryIcon from '@mui/icons-material/History';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { addToSyncQueue } from '@/lib/sync';
 
 export default function AdminInventoryPage() {
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
@@ -47,13 +45,8 @@ export default function AdminInventoryPage() {
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products');
-        await db.products.bulkPut(response.data);
-        return response.data;
-      } catch (error) {
-        return db.products.where('deleted').equals(false).toArray();
-      }
+      const response = await api.get('/products');
+      return response.data;
     },
   });
 
@@ -85,24 +78,8 @@ export default function AdminInventoryPage() {
 
   const createMovementMutation = useMutation({
     mutationFn: async (data: { productId: string; change: number; reason: string }) => {
-      try {
-        const response = await api.post('/inventory/movements', data);
-        return response.data;
-      } catch (error: any) {
-        if (!navigator.onLine) {
-          // Save to local DB and sync queue
-          const movement = {
-            ...data,
-            id: `local_${Date.now()}`,
-            userId: 'current-user-id', // Would get from auth context
-            createdAt: new Date(),
-          };
-          await db.inventory_movements.add(movement);
-          await addToSyncQueue('inventory_movement', 'create', movement.id, data);
-          return movement;
-        }
-        throw error;
-      }
+      const response = await api.post('/inventory/movements', data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -133,7 +110,7 @@ export default function AdminInventoryPage() {
     setSelectedProduct(null);
   };
 
-  const handleSubmitAdjustment = () => {
+  const handleSubmitAdjustment = async () => {
     if (!selectedProduct || !adjustmentData.change || !adjustmentData.reason) {
       alert('Please fill all fields');
       return;
@@ -145,11 +122,15 @@ export default function AdminInventoryPage() {
       return;
     }
 
-    createMovementMutation.mutate({
-      productId: selectedProduct.id,
-      change,
-      reason: `${adjustmentData.type}: ${adjustmentData.reason}`,
-    });
+    try {
+      await createMovementMutation.mutateAsync({
+        productId: selectedProduct.id,
+        change,
+        reason: `${adjustmentData.type}: ${adjustmentData.reason}`,
+      });
+    } catch (error) {
+      console.error('Failed to create inventory movement:', error);
+    }
   };
 
   const getReasonColor = (reason: string) => {

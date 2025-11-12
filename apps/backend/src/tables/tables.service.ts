@@ -95,6 +95,11 @@ export class TablesService {
       throw new NotFoundException('Table not found');
     }
 
+    // If already occupied, return the table (idempotent for offline queued requests)
+    if (table.status === 'OCCUPIED' && table.startedAt) {
+      return table;
+    }
+
     // Check if there's an active shift for this employee
     const activeShift = await this.prisma.shift.findFirst({
       where: {
@@ -139,7 +144,21 @@ export class TablesService {
 
   async pause(tableId: string) {
     const table = await this.findOne(tableId);
-    if (!table || table.status !== 'OCCUPIED') {
+    if (!table) {
+      throw new Error('Table not found');
+    }
+
+    // If already paused, return the table (idempotent)
+    if (table.status === 'PAUSED') {
+      return table;
+    }
+
+    // If table is already available (checked out), return it (idempotent for offline queued requests)
+    if (table.status === 'AVAILABLE') {
+      return table;
+    }
+
+    if (table.status !== 'OCCUPIED') {
       throw new Error('Table is not occupied');
     }
 
@@ -165,12 +184,29 @@ export class TablesService {
         currentCharge: currentCharge,
         // Don't update totalPausedMs here - it will be updated when resuming
       },
+      include: {
+        game: true,
+      },
     });
   }
 
   async resume(tableId: string) {
     const table = await this.findOne(tableId);
-    if (!table || table.status !== 'PAUSED') {
+    if (!table) {
+      throw new Error('Table not found');
+    }
+
+    // If already occupied, return the table (idempotent)
+    if (table.status === 'OCCUPIED') {
+      return table;
+    }
+
+    // If table is already available (checked out), return it (idempotent for offline queued requests)
+    if (table.status === 'AVAILABLE') {
+      return table;
+    }
+
+    if (table.status !== 'PAUSED') {
       throw new Error('Table is not paused');
     }
 
@@ -190,6 +226,9 @@ export class TablesService {
         pausedAt: null,
         totalPausedMs: newTotalPausedMs,
       },
+      include: {
+        game: true,
+      },
     });
   }
 
@@ -199,8 +238,13 @@ export class TablesService {
       throw new Error('Table not found');
     }
 
+    // If table is already available (checked out), return it (idempotent for offline queued requests)
+    if (table.status === 'AVAILABLE') {
+      return table;
+    }
+
     // If table is not started, just reset it
-    if (!table.startedAt || table.status === 'AVAILABLE') {
+    if (!table.startedAt) {
       return this.reset(tableId);
     }
 

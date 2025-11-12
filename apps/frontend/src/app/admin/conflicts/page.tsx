@@ -28,7 +28,6 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { db } from '@/lib/db';
 import api from '@/lib/api';
 
 export default function AdminConflictsPage() {
@@ -36,34 +35,13 @@ export default function AdminConflictsPage() {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Get conflicts from sync_log table
+  // Get conflicts - no longer needed without offline sync
   const { data: conflicts = [], isLoading } = useQuery({
     queryKey: ['sync', 'conflicts'],
     queryFn: async () => {
-      try {
-        // Get conflicts from IndexedDB
-        const syncLogs = await db.sync_log
-          .where('status')
-          .equals('conflict')
-          .toArray();
-        
-        return syncLogs.map((log) => ({
-          id: log.id,
-          entity: log.entity,
-          action: log.action,
-          entityId: log.entityId,
-          clientData: log.payload,
-          serverData: log.conflictData?.serverData || {},
-          conflictType: log.conflictData?.conflictType || 'unknown',
-          message: log.conflictData?.message || 'Conflict detected',
-          createdAt: log.createdAt,
-        }));
-      } catch (error) {
-        console.error('Error fetching conflicts:', error);
-        return [];
-      }
+      // No conflicts without offline sync
+      return [];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds
   });
 
   const resolveConflictMutation = useMutation({
@@ -87,19 +65,10 @@ export default function AdminConflictsPage() {
         });
         return response.data;
       } else if (resolution === 'server') {
-        // Accept server data, mark conflict as resolved
-        await db.sync_log.update(conflictId, {
-          status: 'synced',
-          conflictData: null,
-        });
+        // Accept server data
         return { resolved: true };
       } else {
-        // Manual resolution - would need additional data
-        // For now, just mark as resolved
-        await db.sync_log.update(conflictId, {
-          status: 'synced',
-          conflictData: null,
-        });
+        // Manual resolution
         return { resolved: true };
       }
     },
@@ -116,22 +85,30 @@ export default function AdminConflictsPage() {
     
     if (resolution === 'server' || resolution === 'manual') {
       // Auto-resolve
-      resolveConflictMutation.mutate({
-        conflictId: conflict.id,
-        resolution,
-      });
+      try {
+        await resolveConflictMutation.mutateAsync({
+          conflictId: conflict.id,
+          resolution,
+        });
+      } catch (error) {
+        console.error('Failed to resolve conflict:', error);
+      }
     }
   };
 
-  const handleManualResolve = () => {
+  const handleManualResolve = async () => {
     if (!selectedConflict) return;
     
     // For manual resolution, admin should edit the entity separately
     // Then mark conflict as resolved
-    resolveConflictMutation.mutate({
-      conflictId: selectedConflict.id,
-      resolution: 'manual',
-    });
+    try {
+      await resolveConflictMutation.mutateAsync({
+        conflictId: selectedConflict.id,
+        resolution: 'manual',
+      });
+    } catch (error) {
+      console.error('Failed to resolve conflict:', error);
+    }
   };
 
   const getConflictTypeColor = (type: string) => {
@@ -326,12 +303,16 @@ export default function AdminConflictsPage() {
           <Button
             variant="contained"
             color="success"
-            onClick={() => {
-              resolveConflictMutation.mutate({
-                conflictId: selectedConflict.id,
-                resolution: 'client',
-                useClientData: true,
-              });
+            onClick={async () => {
+              try {
+                await resolveConflictMutation.mutateAsync({
+                  conflictId: selectedConflict.id,
+                  resolution: 'client',
+                  useClientData: true,
+                });
+              } catch (error) {
+                console.error('Failed to resolve conflict:', error);
+              }
             }}
             disabled={resolveConflictMutation.isPending}
           >
@@ -340,11 +321,15 @@ export default function AdminConflictsPage() {
           <Button
             variant="contained"
             color="info"
-            onClick={() => {
-              resolveConflictMutation.mutate({
-                conflictId: selectedConflict.id,
-                resolution: 'server',
-              });
+            onClick={async () => {
+              try {
+                await resolveConflictMutation.mutateAsync({
+                  conflictId: selectedConflict.id,
+                  resolution: 'server',
+                });
+              } catch (error) {
+                console.error('Failed to resolve conflict:', error);
+              }
             }}
             disabled={resolveConflictMutation.isPending}
           >

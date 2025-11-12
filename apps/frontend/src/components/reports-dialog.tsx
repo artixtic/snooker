@@ -23,8 +23,6 @@ import {
   AlertTitle,
 } from '@mui/material';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { addToSyncQueue } from '@/lib/sync';
 
 interface ReportsDialogProps {
   open: boolean;
@@ -121,91 +119,8 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       if (!activeShift) {
         throw new Error('No active shift found');
       }
-      
-      const isOnline = navigator.onLine;
-      
-      if (isOnline) {
-        try {
-          const response = await api.post(`/shifts/${activeShift.id}/close`, data);
-          // Update local shift
-          if (response.data) {
-            await db.shifts.put({ ...response.data, id: activeShift.id });
-          }
-          // Delete expenses from local DB (expenses are deleted on backend)
-          const shiftStartDate = new Date(activeShift.startedAt);
-          const now = new Date();
-          const allExpenses = await db.expenses.toArray();
-          const expensesToDelete = allExpenses.filter((exp: any) => {
-            const expDate = new Date(exp.date);
-            return expDate >= shiftStartDate && expDate <= now;
-          });
-          for (const expense of expensesToDelete) {
-            await db.expenses.delete(expense.id);
-          }
-          return response.data;
-        } catch (error: any) {
-          if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-            // Offline: update local shift and delete expenses
-            const updatedShift = {
-              ...activeShift,
-              status: 'CLOSED' as const,
-              endedAt: new Date().toISOString(),
-              closingCash: data.closingCash,
-              notes: data.notes,
-            };
-            await db.shifts.put({ ...updatedShift, id: activeShift.id });
-            // Delete expenses from local DB
-            const shiftStartDate = new Date(activeShift.startedAt);
-            const now = new Date();
-            const allExpenses = await db.expenses.toArray();
-            const expensesToDelete = allExpenses.filter((exp: any) => {
-              const expDate = new Date(exp.date);
-              return expDate >= shiftStartDate && expDate <= now;
-            });
-            for (const expense of expensesToDelete) {
-              await db.expenses.delete(expense.id);
-            }
-            // Queue for sync
-            await addToSyncQueue('shift', 'update', activeShift.id, {
-              status: 'CLOSED',
-              endedAt: new Date().toISOString(),
-              closingCash: data.closingCash,
-              notes: data.notes,
-            });
-            return updatedShift;
-          }
-          throw error;
-        }
-      } else {
-        // Offline: update local shift and delete expenses
-        const updatedShift = {
-          ...activeShift,
-          status: 'CLOSED' as const,
-          endedAt: new Date().toISOString(),
-          closingCash: data.closingCash,
-          notes: data.notes,
-        };
-        await db.shifts.put({ ...updatedShift, id: activeShift.id });
-        // Delete expenses from local DB
-        const shiftStartDate = new Date(activeShift.startedAt);
-        const now = new Date();
-        const allExpenses = await db.expenses.toArray();
-        const expensesToDelete = allExpenses.filter((exp: any) => {
-          const expDate = new Date(exp.date);
-          return expDate >= shiftStartDate && expDate <= now;
-        });
-        for (const expense of expensesToDelete) {
-          await db.expenses.delete(expense.id);
-        }
-        // Queue for sync
-        await addToSyncQueue('shift', 'update', activeShift.id, {
-          status: 'CLOSED',
-          endedAt: new Date().toISOString(),
-          closingCash: data.closingCash,
-          notes: data.notes,
-        });
-        return updatedShift;
-      }
+      const response = await api.post(`/shifts/${activeShift.id}/close`, data);
+      return response.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -254,7 +169,7 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     setClosingDialogOpen(true);
   };
 
-  const handleConfirmClose = () => {
+  const handleConfirmClose = async () => {
     if (!closingCash || isNaN(Number(closingCash))) {
       alert('Please enter a valid closing cash amount');
       return;
@@ -268,10 +183,14 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
       return;
     }
     
-    closeShiftMutation.mutate({
-      closingCash: Number(closingCash),
-      notes: notes || undefined,
-    });
+    try {
+      await closeShiftMutation.mutateAsync({
+        closingCash: Number(closingCash),
+        notes: notes || undefined,
+      });
+    } catch (error) {
+      console.error('Failed to close shift:', error);
+    }
   };
 
   return (

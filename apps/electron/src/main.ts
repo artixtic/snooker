@@ -16,10 +16,41 @@ function createWindow() {
     width: 1400,
     height: 900,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/preload.js'),
+      preload: path.join(__dirname, 'preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Prevent navigation to external URLs (but allow internal navigation)
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    if (parsedUrl.origin !== FRONTEND_URL && !parsedUrl.origin.includes('localhost')) {
+      event.preventDefault();
+    }
+  });
+
+  // Prevent drag and drop file events
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow.webContents.executeJavaScript(`
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      // Remove any existing drag event listeners that might cause issues
+      window.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    `).catch(console.error);
   });
 
   // Load frontend

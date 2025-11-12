@@ -19,13 +19,12 @@ import {
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { db } from '@/lib/db';
-import { startSync, addToSyncQueue } from '@/lib/sync';
 import { useCartStore } from '@/store/cart-store';
 import { CartDrawer } from '@/components/cart-drawer';
 import { PaymentModal } from '@/components/payment-modal';
 import { TableSelector } from '@/components/table-selector';
 import { PaymentMethod } from '@prisma/client';
+import { dataCache, CACHE_KEYS } from '@/lib/data-cache';
 
 export default function POSPage() {
   const [cartOpen, setCartOpen] = useState(false);
@@ -34,18 +33,14 @@ export default function POSPage() {
   const queryClient = useQueryClient();
   const { items, total, clearCart, tableId, setTable } = useCartStore();
 
-  // Fetch products (with offline support)
+  // Fetch products
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/products');
-        await db.products.bulkPut(response.data);
-        return response.data;
-      } catch (error) {
-        return db.products.where('deleted').equals(false).toArray();
-      }
+      const response = await api.get('/products');
+      return response.data;
     },
+    initialData: () => dataCache.get(CACHE_KEYS.PRODUCTS) || undefined,
   });
 
   // Fetch selected table details
@@ -95,24 +90,8 @@ export default function POSPage() {
   // Create sale mutation
   const createSaleMutation = useMutation({
     mutationFn: async (saleData: any) => {
-      try {
-        const response = await api.post('/sales', saleData);
-        return response.data;
-      } catch (error: any) {
-        // If offline, save to local DB and sync queue
-        if (!navigator.onLine) {
-          const localSale = {
-            ...saleData,
-            id: `local_${Date.now()}`,
-            synced: false,
-            createdAt: new Date(),
-          };
-          await db.sales.add(localSale);
-          await addToSyncQueue('sale', 'create', localSale.id, saleData);
-          return localSale;
-        }
-        throw error;
-      }
+      const response = await api.post('/sales', saleData);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -122,9 +101,6 @@ export default function POSPage() {
     },
   });
 
-  useEffect(() => {
-    startSync(30000); // Sync every 30 seconds
-  }, []);
 
   // Filter products by search
   const filteredProducts = products.filter((product: any) => {
@@ -198,14 +174,9 @@ export default function POSPage() {
   const handlePrintReceipt = async (saleId: string) => {
     if (window.electronAPI) {
       try {
-        // Get sale from API or local DB
-        let sale;
-        try {
-          const response = await api.get(`/sales/${saleId}`);
-          sale = response.data;
-        } catch (error) {
-          sale = await db.sales.get(saleId);
-        }
+        // Get sale from API
+        const response = await api.get(`/sales/${saleId}`);
+        const sale = response.data;
 
         if (sale) {
           // Calculate table charge from sale subtotal vs items subtotal

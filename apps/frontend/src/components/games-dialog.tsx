@@ -62,7 +62,7 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
       resetForm();
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || 'Failed to create game');
+      alert(error?.response?.data?.message || error?.message || 'Failed to create game');
     },
   });
 
@@ -76,7 +76,7 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
       resetForm();
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || 'Failed to update game');
+      alert(error?.response?.data?.message || error?.message || 'Failed to update game');
     },
   });
 
@@ -90,7 +90,7 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any) => {
-      alert(error?.response?.data?.message || 'Failed to delete game');
+      alert(error?.response?.data?.message || error?.message || 'Failed to delete game');
     },
   });
 
@@ -102,7 +102,7 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
     setEditingGame(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       alert('Please enter a game name');
       return;
@@ -115,10 +115,14 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
       defaultRate,
     };
 
-    if (editingGame) {
-      updateGameMutation.mutate({ id: editingGame.id, data });
-    } else {
-      createGameMutation.mutate(data);
+    try {
+      if (editingGame) {
+        await updateGameMutation.mutateAsync({ id: editingGame.id, data });
+      } else {
+        await createGameMutation.mutateAsync(data);
+      }
+    } catch (error) {
+      console.error('Failed to save game:', error);
     }
   };
 
@@ -130,9 +134,13 @@ export function GamesDialog({ open, onClose }: GamesDialogProps) {
     setDefaultRate(Number(game.defaultRate));
   };
 
-  const handleDelete = (game: any) => {
+  const handleDelete = async (game: any) => {
     if (confirm(`Delete "${game.name}"? This will remove the game association from all tables.`)) {
-      deleteGameMutation.mutate(game.id);
+      try {
+        await deleteGameMutation.mutateAsync(game.id);
+      } catch (error) {
+        console.error('Failed to delete game:', error);
+      }
     }
   };
 

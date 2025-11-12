@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Providers } from './providers-client';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { OfflineIndicator } from '@/components/offline-indicator';
+import { DragEventFix } from '../components/drag-event-fix';
 
 export const metadata: Metadata = {
   title: 'Snooker POS',
@@ -16,7 +17,21 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        {/* Initialize dragEvent globally before React loads to prevent ReferenceError in Electron */}
+        <Script
+          id="drag-event-fix-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Initialize dragEvent globally to prevent ReferenceError in Electron
+              if (typeof window !== 'undefined' && !window.dragEvent) {
+                window.dragEvent = null;
+              }
+            `,
+          }}
+        />
         <ErrorBoundary>
+          <DragEventFix />
           <Providers>
             {children}
           </Providers>

@@ -224,7 +224,13 @@ export default function MatchesPage() {
                         size="small"
                         variant="outlined"
                         startIcon={<Pause />}
-                        onClick={() => pauseMatchMutation.mutate(match.id)}
+                        onClick={async () => {
+                          try {
+                            await pauseMatchMutation.mutateAsync(match.id);
+                          } catch (error) {
+                            console.error('Failed to pause match:', error);
+                          }
+                        }}
                       >
                         Pause
                       </Button>
@@ -251,7 +257,11 @@ export default function MatchesPage() {
                               finalScores[p.playerId] = p.score;
                             }
                           });
-                          endMatchMutation.mutate({ id: match.id, finalScores });
+                          try {
+                            await endMatchMutation.mutateAsync({ id: match.id, finalScores });
+                          } catch (error) {
+                            console.error('Failed to end match:', error);
+                          }
                         }}
                       >
                         End Match
@@ -263,7 +273,13 @@ export default function MatchesPage() {
                       size="small"
                       variant="outlined"
                       startIcon={<PlayArrow />}
-                      onClick={() => resumeMatchMutation.mutate(match.id)}
+                      onClick={async () => {
+                        try {
+                          await resumeMatchMutation.mutateAsync(match.id);
+                        } catch (error) {
+                          console.error('Failed to resume match:', error);
+                        }
+                      }}
                     >
                       Resume
                     </Button>
@@ -282,7 +298,13 @@ export default function MatchesPage() {
           <CreateMatchForm
             tables={tables}
             users={users}
-            onSubmit={(data) => createMatchMutation.mutate(data)}
+            onSubmit={async (data) => {
+              try {
+                await createMatchMutation.mutateAsync(data);
+              } catch (error) {
+                console.error('Failed to create match:', error);
+              }
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -294,7 +316,13 @@ export default function MatchesPage() {
           {selectedMatch && (
             <UpdateScoreForm
               match={selectedMatch}
-              onSubmit={(score) => updateScoreMutation.mutate({ id: selectedMatch.id, score })}
+              onSubmit={async (score) => {
+                try {
+                  await updateScoreMutation.mutateAsync({ id: selectedMatch.id, score });
+                } catch (error) {
+                  console.error('Failed to update score:', error);
+                }
+              }}
             />
           )}
         </DialogContent>

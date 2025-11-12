@@ -55,13 +55,17 @@ export function ExpenseDialog({ open, onClose }: ExpenseDialogProps) {
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (expenseName && amount) {
-      createMutation.mutate({
-        description: expenseName,
-        amount: parseFloat(amount),
-        category: 'OTHER',
-      });
+      try {
+        await createMutation.mutateAsync({
+          description: expenseName,
+          amount: parseFloat(amount),
+          category: 'OTHER',
+        });
+      } catch (error) {
+        console.error('Failed to create expense:', error);
+      }
     }
   };
 

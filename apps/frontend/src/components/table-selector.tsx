@@ -58,21 +58,89 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
 
   const pauseTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
+      // Check current table state before making request
+      const cachedTables = queryClient.getQueryData<any[]>(['tables']) || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      // If table is already paused, return early (idempotent)
+      if (table && table.status === 'PAUSED') {
+        return table;
+      }
+      
       const response = await api.post(`/tables/${tableId}/pause`, {});
       return response.data;
     },
+    onMutate: async (tableId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tables'] });
+      
+      // Snapshot previous value
+      const previousTables = queryClient.getQueryData<any[]>(['tables']);
+      
+      // Get current table to calculate charge
+      const cachedTables = previousTables || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      if (table && table.status === 'OCCUPIED' && table.startedAt) {
+        // Calculate current charge at pause time
+        const start = new Date(table.startedAt).getTime();
+        const now = Date.now();
+        const totalElapsed = now - start;
+        const tableTotalPausedMs = table.totalPausedMs || 0;
+        const activeTime = totalElapsed - tableTotalPausedMs;
+        const hours = activeTime / (1000 * 60 * 60);
+        const ratePerHour = Number(table.ratePerHour) || 0;
+        const calculatedCharge = hours * ratePerHour;
+        
+        // Apply optimistic update
+        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
+        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, calculatedCharge));
+      }
+      
+      return { previousTables };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any, tableId: string, context: any) => {
+      // Rollback optimistic update on error
+      if (context?.previousTables) {
+        queryClient.setQueryData(['tables'], context.previousTables);
+      }
+      
+      // Suppress expected errors (table already paused or not occupied)
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not occupied') || errorMessage.includes('already paused') || errorMessage.includes('PAUSED')) {
+        // Silently handle - table might have been paused by another request
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      }
     },
   });
 
   const resumeTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
+      // Check current table state before making request
+      const cachedTables = queryClient.getQueryData<any[]>(['tables']) || [];
+      const table = cachedTables.find((t: any) => t.id === tableId);
+      
+      // If table is already occupied, return early (idempotent)
+      if (table && table.status === 'OCCUPIED') {
+        return table;
+      }
+      
       const response = await api.post(`/tables/${tableId}/resume`, {});
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+    },
+    onError: (error: any) => {
+      // Suppress expected errors (table already occupied or not paused)
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not paused') || errorMessage.includes('already occupied') || errorMessage.includes('OCCUPIED')) {
+        // Silently handle - table might have been resumed by another request
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+      }
     },
   });
 
@@ -97,14 +165,18 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
     setDialogOpen(true);
   };
 
-  const handleConfirmStart = () => {
+  const handleConfirmStart = async () => {
     if (pendingTableId) {
-      startTableMutation.mutate({
-        tableId: pendingTableId,
-        rate: parseFloat(ratePerHour),
-      });
-      onSelectTable(pendingTableId);
-      setPendingTableId(null);
+      try {
+        await startTableMutation.mutateAsync({
+          tableId: pendingTableId,
+          rate: parseFloat(ratePerHour),
+        });
+        onSelectTable(pendingTableId);
+        setPendingTableId(null);
+      } catch (error) {
+        console.error('Failed to start table:', error);
+      }
     }
   };
 
@@ -185,7 +257,13 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
                         color="warning"
                         size="small"
                         startIcon={<PauseIcon />}
-                        onClick={() => pauseTableMutation.mutate(selectedTable.id)}
+                        onClick={async () => {
+                          try {
+                            await pauseTableMutation.mutateAsync(selectedTable.id);
+                          } catch (error) {
+                            console.error('Failed to pause table:', error);
+                          }
+                        }}
                         disabled={pauseTableMutation.isPending}
                         sx={{ flex: 1, minWidth: 120 }}
                       >
@@ -196,9 +274,13 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
                         color="error"
                         size="small"
                         startIcon={<StopIcon />}
-                        onClick={() => {
+                        onClick={async () => {
                           if (confirm('Stop timer and checkout? This will finalize the table session.')) {
-                            stopTableMutation.mutate(selectedTable.id);
+                            try {
+                              await stopTableMutation.mutateAsync(selectedTable.id);
+                            } catch (error) {
+                              console.error('Failed to stop table:', error);
+                            }
                           }
                         }}
                         disabled={stopTableMutation.isPending}
@@ -213,7 +295,13 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
                       color="success"
                       size="small"
                       startIcon={<PlayCircleIcon />}
-                      onClick={() => resumeTableMutation.mutate(selectedTable.id)}
+                      onClick={async () => {
+                        try {
+                          await resumeTableMutation.mutateAsync(selectedTable.id);
+                        } catch (error) {
+                          console.error('Failed to resume table:', error);
+                        }
+                      }}
                       disabled={resumeTableMutation.isPending}
                       fullWidth
                     >

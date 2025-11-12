@@ -1,4 +1,4 @@
-import { IsString, IsArray, ValidateNested, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsOptional, IsDateString, Allow } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SyncOperationDto {
@@ -11,6 +11,9 @@ export class SyncOperationDto {
   @IsString()
   action: string;
 
+  // payload can be any type (object, array, primitive, etc.)
+  // Using @Allow() to whitelist it without validation
+  @Allow()
   payload: any;
 
   @IsDateString()

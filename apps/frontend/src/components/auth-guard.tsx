@@ -20,26 +20,36 @@ export function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
       const token = localStorage.getItem('accessToken');
       
       if (!token) {
-        router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+        const currentPath = pathname + (typeof window !== 'undefined' ? window.location.search : '');
+        router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
         return;
       }
 
-      // Verify token is still valid by checking user info
-      // In a real app, you'd decode JWT or call an endpoint
+      // Verify token is valid (no expiration check since tokens never expire)
       try {
-        // For now, just check if token exists
-        // You could add a lightweight verify endpoint
+        // Decode JWT to get user info
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        
+        // Check admin requirement
+        if (requireAdmin && payload.role !== 'admin') {
+          router.push('/dashboard');
+          return;
+        }
+
         setAuthenticated(true);
       } catch (error) {
+        // Invalid token format
         localStorage.removeItem('accessToken');
-        router.push('/login');
+        localStorage.removeItem('userId');
+        const currentPath = pathname + (typeof window !== 'undefined' ? window.location.search : '');
+        router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
       } finally {
         setLoading(false);
       }
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, requireAdmin]);
 
   if (loading) {
     return (
