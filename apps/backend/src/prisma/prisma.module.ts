@@ -6,5 +6,14 @@ import { PrismaService } from './prisma.service';
   providers: [PrismaService],
   exports: [PrismaService],
 })
-export class PrismaModule {}
+export class PrismaModule {
+  // Make ConfigService available to PrismaService
+  static forRoot() {
+    return {
+      module: PrismaModule,
+      providers: [PrismaService],
+      exports: [PrismaService],
+    };
+  }
+}
 

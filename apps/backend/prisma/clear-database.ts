@@ -1,77 +1,137 @@
 import { PrismaClient } from '@prisma/client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 
-async function clearDatabase() {
-  console.log('🗑️  Starting database cleanup...\n');
+// Read .env file to get backup database URL
+const envPath = path.join(__dirname, '..', '.env');
+let backupDatabaseUrl: string | undefined;
+
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  const lines = envContent.split('\n');
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (trimmedLine.startsWith('BACKUP_DATABASE_URL=')) {
+      const match = trimmedLine.match(/BACKUP_DATABASE_URL=(?:"([^"]+)"|([^\s]+))/);
+      if (match) {
+        backupDatabaseUrl = match[1] || match[2];
+        break;
+      }
+    }
+  }
+}
+
+async function clearDatabase(client: PrismaClient, databaseName: string) {
+  console.log(`\n🗑️  Clearing ${databaseName}...\n`);
 
   try {
     // Delete in order to respect foreign key constraints
     console.log('Deleting tournament matches...');
-    await prisma.tournamentMatch.deleteMany();
+    await client.tournamentMatch.deleteMany();
 
     console.log('Deleting tournament players...');
-    await prisma.tournamentPlayer.deleteMany();
+    await client.tournamentPlayer.deleteMany();
 
     console.log('Deleting tournaments...');
-    await prisma.tournament.deleteMany();
+    await client.tournament.deleteMany();
 
     console.log('Deleting match players...');
-    await prisma.matchPlayer.deleteMany();
+    await client.matchPlayer.deleteMany();
 
     console.log('Deleting matches...');
-    await prisma.match.deleteMany();
+    await client.match.deleteMany();
 
     console.log('Deleting kitchen orders...');
-    await prisma.kitchenOrder.deleteMany();
+    await client.kitchenOrder.deleteMany();
 
     console.log('Deleting table rate rules...');
-    await prisma.tableRateRule.deleteMany();
+    await client.tableRateRule.deleteMany();
 
     console.log('Deleting table maintenance records...');
-    await prisma.tableMaintenance.deleteMany();
+    await client.tableMaintenance.deleteMany();
 
     console.log('Deleting bookings...');
-    await prisma.booking.deleteMany();
+    await client.booking.deleteMany();
 
     console.log('Deleting expenses...');
-    await prisma.expense.deleteMany();
+    await client.expense.deleteMany();
 
     console.log('Deleting sale items...');
-    await prisma.saleItem.deleteMany();
+    await client.saleItem.deleteMany();
 
     console.log('Deleting sales...');
-    await prisma.sale.deleteMany();
+    await client.sale.deleteMany();
 
     console.log('Deleting inventory movements...');
-    await prisma.inventoryMovement.deleteMany();
+    await client.inventoryMovement.deleteMany();
 
     console.log('Deleting activity logs...');
-    await prisma.activityLog.deleteMany();
+    await client.activityLog.deleteMany();
 
     console.log('Deleting sync logs...');
-    await prisma.syncLog.deleteMany();
+    await client.syncLog.deleteMany();
 
     console.log('Deleting shifts...');
-    await prisma.shift.deleteMany();
+    await client.shift.deleteMany();
 
     console.log('Deleting table sessions...');
-    await prisma.tableSession.deleteMany();
+    await client.tableSession.deleteMany();
 
     console.log('Deleting games...');
-    await prisma.game.deleteMany();
+    await client.game.deleteMany();
 
     console.log('Deleting products...');
-    await prisma.product.deleteMany();
+    await client.product.deleteMany();
 
     // Note: We keep users by default, but you can uncomment to delete them too
     // console.log('Deleting users...');
-    // await prisma.user.deleteMany();
+    // await client.user.deleteMany();
 
-    console.log('\n✅ Database cleared successfully!');
+    console.log(`\n✅ ${databaseName} cleared successfully!`);
+  } catch (error) {
+    console.error(`❌ Error clearing ${databaseName}:`, error);
+    throw error;
+  }
+}
+
+async function main() {
+  console.log('🗑️  Starting database cleanup...\n');
+
+  try {
+    // Clear main database
+    await clearDatabase(prisma, 'Main database');
+
+    // Clear backup database if configured
+    if (backupDatabaseUrl) {
+      console.log('\n📦 Backup database URL found, clearing backup database...');
+      const backupPrisma = new PrismaClient({
+        datasources: {
+          db: {
+            url: backupDatabaseUrl,
+          },
+        },
+      });
+
+      try {
+        await backupPrisma.$connect();
+        await clearDatabase(backupPrisma, 'Backup database');
+        await backupPrisma.$disconnect();
+      } catch (error) {
+        console.error('⚠️  Warning: Could not clear backup database:', error);
+        console.error('   This might be because the backup database does not exist or is not accessible.');
+        await backupPrisma.$disconnect().catch(() => {});
+      }
+    } else {
+      console.log('\n⚠️  No BACKUP_DATABASE_URL found in .env, skipping backup database cleanup.');
+    }
+
+    console.log('\n✅ All databases cleared successfully!');
     console.log('⚠️  Note: Users were NOT deleted. Uncomment the user deletion code if needed.');
   } catch (error) {
-    console.error('❌ Error clearing database:', error);
+    console.error('❌ Error during database cleanup:', error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -79,7 +139,7 @@ async function clearDatabase() {
 }
 
 // Run the script
-clearDatabase()
+main()
   .catch((error) => {
     console.error(error);
     process.exit(1);

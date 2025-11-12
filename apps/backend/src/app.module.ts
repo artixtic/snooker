@@ -22,6 +22,7 @@ import { KitchenOrdersModule } from './kitchen-orders/kitchen-orders.module';
 import { MatchesModule } from './matches/matches.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { GamesModule } from './games/games.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { GamesModule } from './games/games.module';
     MatchesModule,
     TournamentsModule,
     GamesModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [AppService],

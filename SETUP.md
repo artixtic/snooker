@@ -23,11 +23,19 @@ pnpm install
 cd apps/backend
 cp .env.example .env
 # Edit .env with your database credentials
+# Optional: Add BACKUP_DATABASE_URL for automatic backups (see BACKUP_CONFIG.md)
 
 # Frontend (optional, defaults work for dev)
 cd ../frontend
 cp .env.example .env.local
 ```
+
+**Backend Environment Variables:**
+- `DATABASE_URL` - Main PostgreSQL database connection string (required)
+- `BACKUP_DATABASE_URL` - Backup PostgreSQL database connection string (optional, see `BACKUP_CONFIG.md`)
+- `PORT` - Backend server port (default: 3001)
+- `CORS_ORIGIN` - Frontend origin URL (default: http://localhost:3000)
+- `JWT_SECRET` - Secret key for JWT tokens (required)
 
 ### 3. Start Database
 
