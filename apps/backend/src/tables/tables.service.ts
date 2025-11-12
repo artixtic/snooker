@@ -145,7 +145,7 @@ export class TablesService {
   async pause(tableId: string) {
     const table = await this.findOne(tableId);
     if (!table) {
-      throw new Error('Table not found');
+      throw new NotFoundException('Table not found');
     }
 
     // If already paused, return the table (idempotent)
@@ -159,21 +159,28 @@ export class TablesService {
     }
 
     if (table.status !== 'OCCUPIED') {
-      throw new Error('Table is not occupied');
+      throw new BadRequestException(`Table is ${table.status.toLowerCase()}, cannot pause`);
     }
 
     if (!table.startedAt) {
-      throw new Error('Table has no start time');
+      throw new BadRequestException('Table has no start time. Please start the table first.');
     }
 
     const now = new Date();
     const lastResumedAt = table.lastResumedAt || table.startedAt;
     if (!lastResumedAt) {
-      throw new Error('Table has no start time');
+      throw new BadRequestException('Table has no start time. Please start the table first.');
     }
 
     // Calculate current charge at pause time using the game's rate type
-    const currentCharge = this.calculateCurrentCharge(table);
+    let currentCharge = 0;
+    try {
+      currentCharge = this.calculateCurrentCharge(table);
+    } catch (error) {
+      console.error('Error calculating charge for pause:', error);
+      // Continue with 0 charge if calculation fails
+      currentCharge = 0;
+    }
 
     // When pausing, we just set pausedAt. The pause duration will be added to totalPausedMs when resuming
     return this.prisma.tableSession.update({
@@ -190,7 +197,7 @@ export class TablesService {
     });
   }
 
-  async resume(tableId: string) {
+  async resume(tableId: string, clientPausedAt?: string) {
     const table = await this.findOne(tableId);
     if (!table) {
       throw new Error('Table not found');
@@ -210,12 +217,18 @@ export class TablesService {
       throw new Error('Table is not paused');
     }
 
-    if (!table.pausedAt) {
+    // Use client-provided pausedAt if available (for offline sync scenarios),
+    // otherwise use the database pausedAt
+    const pausedAtTime = clientPausedAt 
+      ? new Date(clientPausedAt).getTime()
+      : (table.pausedAt ? table.pausedAt.getTime() : null);
+
+    if (!pausedAtTime) {
       throw new Error('Table has no pause time');
     }
 
     const now = new Date();
-    const pauseDuration = now.getTime() - table.pausedAt.getTime();
+    const pauseDuration = now.getTime() - pausedAtTime;
     const newTotalPausedMs = (table.totalPausedMs || 0) + pauseDuration;
 
     return this.prisma.tableSession.update({

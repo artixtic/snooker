@@ -91,9 +91,6 @@ export function TableTimer({
         const hours = activeTime / (1000 * 60 * 60);
         const calculatedCharge = hours * ratePerHour;
         
-        // Apply optimistic update
-        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, calculatedCharge));
       }
       
       return { previousTables };
@@ -102,7 +99,6 @@ export function TableTimer({
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any, variables: any, context: any) => {
-      // Rollback optimistic update on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -127,7 +123,8 @@ export function TableTimer({
         return table;
       }
       
-      const response = await api.post(`/tables/${tableId}/resume`, {});
+      const body = table?.pausedAt ? { pausedAt: table.pausedAt } : undefined;
+      const response = await api.post(`/tables/${tableId}/resume`, body);
       return response.data;
     },
     onSuccess: () => {

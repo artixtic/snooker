@@ -35,9 +35,9 @@ export function useAuth() {
     setLoading(false);
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('userId');
+  const logout = async () => {
+    const { clearAllData } = await import('@/lib/logout-utils');
+    await clearAllData();
     setUser(null);
   };
 

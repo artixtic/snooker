@@ -94,14 +94,19 @@ export default function LoginPage() {
               component="h1" 
               gutterBottom 
               sx={{ 
-                fontWeight: 'bold',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                fontWeight: 800,
+                fontSize: '3rem',
+                letterSpacing: 3,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
                 mb: 1,
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                textShadow: '0 4px 8px rgba(102, 126, 234, 0.3)',
               }}
             >
-              🎱 Smart Cue
+              🎱 Cue & Console
             </Typography>
             <Typography 
               variant="body1" 

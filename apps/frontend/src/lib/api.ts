@@ -1,7 +1,5 @@
 // API client setup with axios
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { dataCache, CACHE_KEYS } from './data-cache';
-import { offlineApi } from './offline/offline-api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -70,126 +68,7 @@ axiosInstance.interceptors.response.use(
   },
 );
 
-// Check if URL is an authentication endpoint that should bypass offline wrapper
-const isAuthEndpoint = (url: string): boolean => {
-  return url.startsWith('/auth/') || url === '/auth';
-};
-
-// Create API wrapper with offline support
-const createApi = (instance: AxiosInstance) => {
-  const api = {
-    // GET request - uses offline API for caching and offline support
-    get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      // Bypass offline wrapper for auth endpoints
-      if (isAuthEndpoint(url)) {
-        return instance.get<T>(url, config);
-      }
-      return offlineApi.get<T>(url, config);
-    },
-
-    // POST request - uses offline API for queuing
-    post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      // Bypass offline wrapper for auth endpoints (login, refresh, logout)
-      if (isAuthEndpoint(url)) {
-        return instance.post<T>(url, data, config);
-      }
-      return offlineApi.post<T>(url, data, config);
-    },
-
-    // PUT request - uses offline API for queuing
-    put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      // Bypass offline wrapper for auth endpoints
-      if (isAuthEndpoint(url)) {
-        return instance.put<T>(url, data, config);
-      }
-      return offlineApi.put<T>(url, data, config);
-    },
-
-    // PATCH request - uses offline API for queuing
-    patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      // Bypass offline wrapper for auth endpoints
-      if (isAuthEndpoint(url)) {
-        return instance.patch<T>(url, data, config);
-      }
-      return offlineApi.patch<T>(url, data, config);
-    },
-
-    // DELETE request - uses offline API for queuing
-    delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      // Bypass offline wrapper for auth endpoints
-      if (isAuthEndpoint(url)) {
-        return instance.delete<T>(url, config);
-      }
-      return offlineApi.delete<T>(url, config);
-    },
-
-    // HEAD request
-    head: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      return instance.head<T>(url, config);
-    },
-
-    // OPTIONS request
-    options: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      return instance.options<T>(url, config);
-    },
-
-    // Direct call (for interceptors and advanced usage)
-    request: <T = any>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
-      return instance.request<T>(config);
-    },
-
-    // Expose interceptors for compatibility
-    interceptors: instance.interceptors,
-
-    // Expose default config
-    defaults: instance.defaults,
-
-    // Expose getUri method
-    getUri: (config?: AxiosRequestConfig): string => {
-      return instance.getUri(config);
-    },
-  };
-
-  return api;
-};
-
-// Helper function to get cache key from URL
-function getCacheKey(url: string): string | null {
-  // Map API endpoints to cache keys
-  if (url === '/games' || url.startsWith('/games?')) {
-    return CACHE_KEYS.GAMES;
-  }
-  if (url === '/tables' || url.startsWith('/tables?')) {
-    return CACHE_KEYS.TABLES;
-  }
-  if (url === '/products' || url.startsWith('/products?')) {
-    return CACHE_KEYS.PRODUCTS;
-  }
-  if (url.startsWith('/inventory')) {
-    return CACHE_KEYS.INVENTORY;
-  }
-  if (url === '/shifts' || url.startsWith('/shifts?')) {
-    return CACHE_KEYS.SHIFTS;
-  }
-  if (url.startsWith('/users')) {
-    return CACHE_KEYS.USERS;
-  }
-  if (url.startsWith('/sales')) {
-    return CACHE_KEYS.SALES;
-  }
-  if (url.startsWith('/expenses')) {
-    return CACHE_KEYS.EXPENSES;
-  }
-  
-  // For specific resource endpoints, don't cache (e.g., /tables/:id)
-  if (url.match(/\/\w+\/[^\/]+$/)) {
-    return null;
-  }
-  
-  return null;
-}
-
-// Export the API instance
-export const api = createApi(axiosInstance) as AxiosInstance;
+// Export the API instance directly
+export const api = axiosInstance;
 
 export default api;

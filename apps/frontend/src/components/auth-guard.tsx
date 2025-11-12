@@ -38,9 +38,9 @@ export function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
 
         setAuthenticated(true);
       } catch (error) {
-        // Invalid token format
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('userId');
+        // Invalid token format - clear all data
+        const { clearAllData } = await import('@/lib/logout-utils');
+        await clearAllData();
         const currentPath = pathname + (typeof window !== 'undefined' ? window.location.search : '');
         router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
       } finally {

@@ -92,9 +92,6 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
         const ratePerHour = Number(table.ratePerHour) || 0;
         const calculatedCharge = hours * ratePerHour;
         
-        // Apply optimistic update
-        const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, calculatedCharge));
       }
       
       return { previousTables };
@@ -103,7 +100,6 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any, tableId: string, context: any) => {
-      // Rollback optimistic update on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -128,7 +124,8 @@ export function TableSelector({ selectedTableId, onSelectTable, onCheckout, onSt
         return table;
       }
       
-      const response = await api.post(`/tables/${tableId}/resume`, {});
+      const body = table?.pausedAt ? { pausedAt: table.pausedAt } : undefined;
+      const response = await api.post(`/tables/${tableId}/resume`, body);
       return response.data;
     },
     onSuccess: () => {

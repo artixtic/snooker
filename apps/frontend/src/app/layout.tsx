@@ -5,8 +5,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { DragEventFix } from '../components/drag-event-fix';
 
 export const metadata: Metadata = {
-  title: 'Snooker POS',
-  description: 'Point of Sale System for Snooker Club',
+  title: 'Cue & Console',
+  description: 'Premium Point of Sale System for Snooker & Gaming Club',
 };
 
 export default function RootLayout({

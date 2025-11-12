@@ -15,6 +15,7 @@ import {
   Toolbar,
   IconButton,
   Badge,
+  Avatar,
 } from '@mui/material';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -188,7 +189,7 @@ export default function POSPage() {
 
           const lines = [
             '═══════════════════════',
-            '    SNOOKER POS',
+            '   CUE & CONSOLE',
             '═══════════════════════',
             `Receipt #${sale.receiptNumber || sale.id}`,
             `Date: ${new Date(sale.createdAt).toLocaleString()}`,
@@ -238,9 +239,60 @@ export default function POSPage() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Snooker POS
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+            <Avatar
+              sx={{
+                width: { xs: 36, sm: 44, md: 52 },
+                height: { xs: 36, sm: 44, md: 52 },
+                background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 25%, #FFA07A 50%, #FFB347 75%, #FFD700 100%)',
+                boxShadow: '0 4px 20px rgba(255, 107, 107, 0.5), 0 0 30px rgba(255, 215, 0, 0.3)',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                fontSize: { xs: '1.4rem', sm: '1.6rem', md: '1.8rem' },
+                fontWeight: 'bold',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'scale(1.1) rotate(5deg)',
+                  boxShadow: '0 6px 30px rgba(255, 107, 107, 0.7), 0 0 40px rgba(255, 215, 0, 0.5)',
+                }
+              }}
+            >
+              🎱
+            </Avatar>
+            <Typography 
+              variant="h5" 
+              component="div"
+              sx={{ 
+                fontWeight: 800,
+                fontSize: { xs: '1.4rem', sm: '1.75rem', md: '2rem' },
+                letterSpacing: { xs: 1.5, sm: 2, md: 2.5 },
+                background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 30%, #ffffff 60%, #e8eaf6 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                textShadow: '0 4px 8px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)',
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                position: 'relative',
+                display: 'inline-block',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-4px',
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent)',
+                  borderRadius: '2px',
+                },
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'scale(1.02)',
+                  filter: 'brightness(1.1)',
+                }
+              }}
+            >
+              Cue & Console
+            </Typography>
+          </Box>
           <IconButton color="inherit" onClick={() => setCartOpen(true)}>
             <Badge badgeContent={items.length} color="error">
               <ShoppingCartIcon />

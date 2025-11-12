@@ -57,7 +57,6 @@ import { CustomReportsDialog } from '@/components/custom-reports-dialog';
 import { ShiftModal } from '@/components/shift-modal';
 import { GamesDialog } from '@/components/games-dialog';
 import { InventorySaleDialog } from '@/components/inventory-sale-dialog';
-import { SyncStatus } from '@/components/sync-status';
 import { dataCache, CACHE_KEYS } from '@/lib/data-cache';
 
 interface Table {
@@ -120,7 +119,7 @@ export default function DashboardPage() {
     staleTime: 30000, // Consider data fresh for 30 seconds
     onError: (error: any) => {
       // API interceptor handles 401 redirects, but log other errors
-      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+      if (error?.response?.status !== 401) {
         console.error('Games query error:', error);
       }
     },
@@ -142,7 +141,7 @@ export default function DashboardPage() {
     staleTime: 5000, // Consider data fresh for 5 seconds
     onError: (error: any) => {
       // API interceptor handles 401 redirects, but log other errors
-      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+      if (error?.response?.status !== 401) {
         console.error('Tables query error:', error);
       }
     },
@@ -175,7 +174,7 @@ export default function DashboardPage() {
     retry: false, // Don't retry - fail fast
     onError: (error: any) => {
       // API interceptor handles 401 redirects, but log other errors
-      if (!error?.message?.includes('Offline') && error?.response?.status !== 401) {
+      if (error?.response?.status !== 401) {
         console.error('Shifts query error:', error);
       }
     },
@@ -204,7 +203,7 @@ export default function DashboardPage() {
 
 
 
-  // Start table mutation with optimistic updates
+  // Start table mutation
   const startTableMutation = useMutation({
     mutationFn: async ({ tableId, ratePerHour }: { tableId: string; ratePerHour: number }) => {
       const response = await api.post(`/tables/${tableId}/start`, { ratePerHour });
@@ -223,36 +222,20 @@ export default function DashboardPage() {
       const cachedTables = previousTables || [];
       const table = cachedTables.find((t: Table) => t.id === tableId);
       
-      if (table && table.status === 'AVAILABLE') {
-        // Apply optimistic update to table (set to OCCUPIED)
-        const { applyOptimisticUpdate, createStartTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createStartTableUpdate(tableId, ratePerHour));
-      }
-      
-      // Close dialog immediately (optimistic)
+      // Close dialog
       setStartTableDialogOpen(false);
       setRatePerMinute(8);
-      setStartingTableId(null); // Clear immediately after optimistic update
       
       return { previousTables };
     },
     onSuccess: async (data, variables) => {
       setStartingTableId(null);
       
-      // Only invalidate if this is NOT a queued request (queued requests are handled by sync queue)
-      // Check if the response indicates it was queued
-      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
-        // This was queued, don't invalidate yet - wait for sync queue to complete
-        console.log('📦 Start request was queued, skipping query invalidation (will sync later)');
-        return;
-      }
-      // For successful online requests, invalidate to refresh
       await queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any, variables, context: any) => {
       setStartingTableId(null);
       
-      // Rollback optimistic update on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -261,10 +244,7 @@ export default function DashboardPage() {
       setStartTableDialogOpen(true);
       
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to start table. Please try again.';
-      // Don't show alert for queued requests (offline scenario)
-      if (!errorMessage.includes('queued') && !error?.code?.includes('ERR_NETWORK')) {
-        alert(`⚠️ ${errorMessage}`);
-      }
+      alert(`⚠️ ${errorMessage}`);
     },
   });
 
@@ -357,78 +337,13 @@ export default function DashboardPage() {
       const table = cachedTables.find((t: Table) => t.id === tableId);
       
       if (table) {
-        // Clear cart items immediately (optimistic)
-        setTableCartItems(prev => {
-          const updated = { ...prev };
-          delete updated[tableId];
-          return updated;
-        });
-        
-        // Close dialog immediately (optimistic)
-        setCheckoutDialogOpen(false);
-        setSelectedTable(null);
-        
-        // Apply optimistic update to table (set to AVAILABLE)
-        const { applyOptimisticUpdate, createStopTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createStopTableUpdate(tableId));
-        
-        // If creating a sale, add optimistic sale update
-        if (!skipSale) {
-          // Calculate totals for optimistic sale
-          let tableCharge = Math.ceil(Number(table.currentCharge) || 0);
-          if (tableCharge === 0 && table.status === 'OCCUPIED' && table.startedAt) {
-            tableCharge = Math.ceil(calculateCurrentCharge(table));
-          }
-          const cartItemsTotal = Math.ceil(cartItems?.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0) || 0);
-          const subtotal = tableCharge + cartItemsTotal;
-          const tableTax = taxEnabled ? Math.ceil(tableCharge * 0.15) : 0;
-          const cartTax = taxEnabled ? Math.ceil(cartItemsTotal * 0.15) : 0;
-          const tax = tableTax + cartTax;
-          const total = Math.ceil(subtotal + tax);
-          
-          // Create optimistic sale
-          const optimisticSale = {
-            id: `temp-${Date.now()}`,
-            tableId,
-            subtotal,
-            tax: tax > 0 ? tax : undefined,
-            total,
-            paymentMethod: 'CASH' as const,
-            cashReceived: Math.ceil(Number(paymentAmount)),
-            change: Math.ceil(Math.max(0, paymentAmount - total)),
-            items: cartItems?.map(item => ({
-              productId: item.productId,
-              quantity: Number(item.quantity),
-              unitPrice: Math.ceil(Number(item.price)),
-              discount: 0,
-              tax: taxEnabled ? Math.ceil(Math.ceil(Number(item.price)) * Number(item.quantity) * 0.15) : undefined,
-              subtotal: Math.ceil(Number(item.price) * Number(item.quantity)),
-            })) || [],
-            createdAt: new Date().toISOString(),
-          };
-          
-          // Apply optimistic sale update to React Query cache
-          queryClient.setQueryData<any[]>(['sales'], (oldSales = []) => [...oldSales, optimisticSale]);
-          
-          // Also save to IndexedDB for offline persistence
-          const { storage } = await import('@/lib/db/storage');
-          const currentSales = queryClient.getQueryData<any[]>(['sales']) || [];
-          await storage.sales.saveAll(currentSales);
-        }
       }
       
       return { previousTables, previousSales, previousCartItems, previousSelectedTable, previousDialogOpen, tableId };
     },
     onSuccess: async (data) => {
-      // Skip invalidation for queued requests (handled by sync queue)
-      // Note: For checkout, the optimistic update already handles UI updates
-      // The queued response will have { queued: true } but data.tableId might not exist
-      const isQueued = data && typeof data === 'object' && 'queued' in data && (data as any).queued === true;
-      
-      if (!isQueued) {
-        // Only clear cart and close dialog for immediate (non-queued) requests
-        // For queued requests, this is already done in onMutate
-        if (data?.tableId) {
+      // Clear cart and close dialog
+      if (data?.tableId) {
           setTableCartItems(prev => {
             const updated = { ...prev };
             delete updated[data.tableId];
@@ -439,15 +354,11 @@ export default function DashboardPage() {
           setSelectedTable(null);
         }
         
-        await queryClient.invalidateQueries({ queryKey: ['tables'] });
-        await queryClient.invalidateQueries({ queryKey: ['sales'] });
-        await queryClient.invalidateQueries({ queryKey: ['products'] });
-      } else {
-        console.log('📦 Checkout request was queued, skipping query invalidation');
-      }
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
+      await queryClient.invalidateQueries({ queryKey: ['sales'] });
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
     },
     onError: (error: any, variables, context: any) => {
-      // Rollback optimistic updates on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -471,10 +382,7 @@ export default function DashboardPage() {
       
       console.error('Checkout failed:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Checkout failed. Please try again.';
-      // Don't show alert for queued requests (offline scenario)
-      if (!errorMessage.includes('queued') && !error?.code?.includes('ERR_NETWORK')) {
-        alert(Array.isArray(errorMessage) ? errorMessage.join('\n') : errorMessage);
-      }
+      alert(Array.isArray(errorMessage) ? errorMessage.join('\n') : errorMessage);
     },
   });
 
@@ -568,22 +476,6 @@ export default function DashboardPage() {
       const table = cachedTables.find((t: Table) => t.id === tableId);
       
       if (table && table.status === 'OCCUPIED' && table.startedAt) {
-        // Calculate current charge at pause time
-        try {
-          const currentCharge = calculateCurrentCharge(table);
-          
-          // Apply optimistic update
-          const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
-          await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId, currentCharge));
-        } catch (error) {
-          console.error('Error calculating charge for pause:', error);
-          // Still apply optimistic update without charge (will be calculated on backend)
-          const { applyOptimisticUpdate, createPauseTableUpdate } = await import('@/lib/offline/optimistic-updates');
-          await applyOptimisticUpdate(queryClient, createPauseTableUpdate(tableId));
-        }
-        
-        // Clear pending state immediately after optimistic update (for offline scenarios)
-        setPausingTableId(null);
       } else if (table && table.status === 'OCCUPIED' && !table.startedAt) {
         // Table is occupied but has no start time - this shouldn't happen, but handle gracefully
         console.warn('Table is occupied but has no start time:', tableId);
@@ -594,21 +486,12 @@ export default function DashboardPage() {
     },
     onSuccess: async (data) => {
       setPausingTableId(null);
-      // Skip invalidation for queued requests (handled by sync queue)
-      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
-        console.log('📦 Pause request was queued, skipping query invalidation');
-        return;
-      }
-      // Don't invalidate queries on successful pause - optimistic update already handled it
-      // Invalidating here causes flickering as it refetches and might show stale state
-      // The sync queue will invalidate after all queued requests are processed
-      console.log('✅ Pause successful, keeping optimistic update (no invalidation to prevent flickering)');
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any, tableId: string, context: any) => {
       // Clear pending state
       setPausingTableId(null);
       
-      // Rollback optimistic update on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -630,11 +513,6 @@ export default function DashboardPage() {
         return;
       }
       
-      // Don't show alert for queued requests (offline scenario)
-      if (error?.code?.includes('ERR_NETWORK') || errorMessageLower.includes('queued')) {
-        console.log('Pause request queued for offline sync');
-        return;
-      }
       
       // Show alert for unexpected errors
       console.error('Pause table error:', error);
@@ -653,8 +531,6 @@ export default function DashboardPage() {
         return table;
       }
       
-      // Send local pausedAt if available (for offline sync scenarios)
-      // This ensures the backend uses the actual pause time, not the sync time
       const body = table?.pausedAt ? { pausedAt: table.pausedAt } : undefined;
       const response = await api.post(`/tables/${tableId}/resume`, body);
       return response.data;
@@ -672,30 +548,16 @@ export default function DashboardPage() {
       const cachedTables = previousTables || [];
       const table = cachedTables.find((t: Table) => t.id === tableId);
       
-      if (table && table.status === 'PAUSED') {
-        // Apply optimistic update to immediately update status and totalPausedMs
-        const { applyOptimisticUpdate, createResumeTableUpdate } = await import('@/lib/offline/optimistic-updates');
-        await applyOptimisticUpdate(queryClient, createResumeTableUpdate(tableId));
-      }
       
       return { previousTables };
     },
     onSuccess: async (data) => {
       setResumingTableId(null);
-      // Skip invalidation for queued requests (handled by sync queue)
-      if (data && typeof data === 'object' && 'queued' in data && (data as any).queued === true) {
-        console.log('📦 Resume request was queued, skipping query invalidation');
-        return;
-      }
-      // Don't invalidate queries on successful resume - optimistic update already handled it
-      // Invalidating here can cause flickering
-      // The sync queue will invalidate after all queued requests are processed
-      console.log('✅ Resume successful, keeping optimistic update (no invalidation to prevent flickering)');
+      await queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any, tableId: string, context: any) => {
       setResumingTableId(null);
       
-      // Rollback optimistic update on error
       if (context?.previousTables) {
         queryClient.setQueryData(['tables'], context.previousTables);
       }
@@ -712,11 +574,6 @@ export default function DashboardPage() {
         return;
       }
       
-      // Don't show alert for queued requests (offline scenario)
-      if (error?.code?.includes('ERR_NETWORK') || errorMessageLower.includes('queued')) {
-        console.log('Resume request queued for offline sync');
-        return;
-      }
       
       console.error('Resume failed:', error);
     },
@@ -1097,7 +954,6 @@ export default function DashboardPage() {
                         // Pause first, then open checkout
                         try {
                           const result = await pauseTableMutation.mutateAsync(table.id);
-                          // Use the result directly from the mutation (works offline)
                           if (result && result.status === 'PAUSED') {
                             setSelectedTable(result as Table);
                             setCheckoutDialogOpen(true);
@@ -1548,15 +1404,10 @@ export default function DashboardPage() {
             size="small"
             startIcon={<Logout />} 
             onClick={async () => {
-              const { clearAllData, isOffline } = await import('@/lib/logout-utils');
-              if (isOffline()) {
-                alert('⚠️ Cannot logout while offline. Please wait until you are online.');
-                return;
-              }
+              const { clearAllData } = await import('@/lib/logout-utils');
               await clearAllData();
               window.location.href = '/login';
             }}
-            disabled={!navigator.onLine || (typeof window !== 'undefined' && (window as any).__forceOfflineMode === true)}
             sx={{
               py: 0.5,
               px: 1.5,
@@ -1615,10 +1466,6 @@ export default function DashboardPage() {
       </Menu>
 
       <Container maxWidth={false} sx={{ py: 4, px: 3, width: '100%', maxWidth: '100%' }}>
-        {/* Sync Status Indicator */}
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-          <SyncStatus />
-        </Box>
         {/* Kanban Board Layout - Games as Columns */}
         <Box
           sx={{

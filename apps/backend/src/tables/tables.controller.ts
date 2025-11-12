@@ -47,8 +47,8 @@ export class TablesController {
   }
 
   @Post(':id/resume')
-  resume(@Param('id') id: string) {
-    return this.tablesService.resume(id);
+  resume(@Param('id') id: string, @Body() body?: { pausedAt?: string }) {
+    return this.tablesService.resume(id, body?.pausedAt);
   }
 
   @Post(':id/stop')
