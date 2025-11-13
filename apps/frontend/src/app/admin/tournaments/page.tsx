@@ -258,7 +258,7 @@ export default function TournamentsPage() {
         <DialogTitle>Create Tournament</DialogTitle>
         <DialogContent>
           <CreateTournamentForm
-            onSubmit={async (data) => {
+            onSubmit={async (data: any) => {
               try {
                 await createTournamentMutation.mutateAsync(data);
               } catch (error) {
@@ -281,7 +281,7 @@ export default function TournamentsPage() {
           {selectedTournament && (
             <AddParticipantForm
               users={users}
-              onSubmit={async (data) => {
+              onSubmit={async (data: any) => {
                 try {
                   await addParticipantMutation.mutateAsync({ id: selectedTournament.id, data });
                 } catch (error) {

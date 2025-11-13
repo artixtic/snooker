@@ -14,7 +14,7 @@ BACKUP_DATABASE_URL="postgresql://user:password@localhost:5432/snooker_pos_backu
 
 # Enable Backup Service (Optional)
 # Set to "true" to enable the backup service, "false" to disable
-# Note: This is automatically set by npm scripts (dev=true, live=false)
+# Note: This is automatically set by npm scripts (dev=true)
 # ENABLE_BACKUP_SERVICE="true"
 ```
 
@@ -22,19 +22,16 @@ BACKUP_DATABASE_URL="postgresql://user:password@localhost:5432/snooker_pos_backu
 
 The backup service can be controlled via npm scripts:
 
-### Development Mode (Backup Service Enabled)
+### Development Mode (`npm run dev`) - Ports 3000/3001
 ```bash
 npm run dev
 ```
-This will start the backend with the backup service **enabled**. The backup service will run every minute.
+- **Main Database**: Uses `DATABASE_URL` (main database)
+- **Backup Database**: Used for backups (backup service **enabled**)
+- **Backup Service**: Runs every minute, copying data from main DB to backup DB
+- **Ports**: Backend on 3001, Frontend on 3000
 
-### Live Mode (Backup Service Disabled)
-```bash
-npm run live
-```
-This will start the backend with the backup service **disabled**. No backups will be performed.
-
-**Note:** The `ENABLE_BACKUP_SERVICE` environment variable is automatically set by these scripts. You can also set it manually in your `.env` file if needed.
+**Note:** The `ENABLE_BACKUP_SERVICE` environment variable is automatically set by the dev script. You can also set it manually in your `.env` file if needed.
 
 ## Setup Instructions
 

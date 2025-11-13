@@ -95,8 +95,8 @@ export function ReportsDialog({ open, onClose }: ReportsDialogProps) {
     enabled: open && !!activeShift,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    staleTime: 0, // Always consider data stale, force fresh fetch
-    cacheTime: 0, // Don't cache, always fetch fresh
+    staleTime: 0, // Always consider data stale, force fresh fetch      
+    gcTime: 0, // Don't cache, always fetch fresh
   });
 
   // Refetch report when dialog opens or when closing dialog opens

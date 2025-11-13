@@ -30,8 +30,8 @@ export function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
         // Decode JWT to get user info
         const payload = JSON.parse(atob(token.split('.')[1]));
         
-        // Check admin requirement
-        if (requireAdmin && payload.role !== 'admin') {
+        // Check admin requirement - role is stored as 'ADMIN' (uppercase) in database
+        if (requireAdmin && payload.role !== 'ADMIN') {
           router.push('/dashboard');
           return;
         }

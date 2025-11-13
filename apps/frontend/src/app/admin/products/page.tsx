@@ -122,7 +122,7 @@ export default function AdminProductsPage() {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const data = {
       name: formData.name,
       sku: formData.sku || undefined,

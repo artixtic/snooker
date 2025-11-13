@@ -44,9 +44,7 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
         const response = await api.get(`/reports/daily?date=${startDate}`);
         return response.data;
       } else if (reportType === 'range' && startDate && endDate) {
-        // For now, we'll use daily endpoint for the start date
-        // Ideally there should be a range endpoint on the backend
-        const response = await api.get(`/reports/daily?date=${startDate}`);
+        const response = await api.get(`/reports/range?startDate=${startDate}&endDate=${endDate}`);
         return response.data;
       }
       return null;
@@ -228,7 +226,11 @@ export function CustomReportsDialog({ open, onClose }: CustomReportsDialogProps)
                   mb: 1,
                 }}
               >
-                📊 Detailed Report - {report.date || (reportType === 'daily' ? startDate : `${startDate} to ${endDate}`)}
+                📊 Detailed Report - {reportType === 'daily' 
+                  ? (report.date || startDate) 
+                  : (report.startDate && report.endDate 
+                    ? `${report.startDate} to ${report.endDate}` 
+                    : `${startDate} to ${endDate}`)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Generated on {new Date().toLocaleString()}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsc && tsc -p preload/tsconfig.json && electron dist/main.js",
     "build": "tsc && tsc -p preload/tsconfig.json",
+    "prod": "cross-env NODE_ENV=production electron dist/main.js",
     "build:electron": "electron-builder",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"

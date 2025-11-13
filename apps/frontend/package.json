@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NODE_ENV=development next dev",
     "build": "next build",
+    "build:prod": "cross-env NODE_ENV=production NEXT_PUBLIC_API_URL=http://localhost:4001 NEXT_PUBLIC_WS_URL=http://localhost:4001 next build",
     "start": "next start",
+    "start:prod": "cross-env NODE_ENV=production next start -p 4000",
     "lint": "next lint",
     "test": "vitest",
     "test:watch": "vitest --watch",

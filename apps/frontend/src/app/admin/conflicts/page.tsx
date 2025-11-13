@@ -30,13 +30,25 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
+interface Conflict {
+  id: number;
+  entity: string;
+  entityId: string;
+  clientData: any;
+  serverData: any;
+  conflictType?: string;
+  message?: string;
+  action?: string;
+  createdAt?: string;
+}
+
 export default function AdminConflictsPage() {
-  const [selectedConflict, setSelectedConflict] = useState<any>(null);
+  const [selectedConflict, setSelectedConflict] = useState<Conflict | null>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Get conflicts - no longer needed without offline sync
-  const { data: conflicts = [], isLoading } = useQuery({
+  const { data: conflicts = [], isLoading } = useQuery<Conflict[]>({
     queryKey: ['sync', 'conflicts'],
     queryFn: async () => {
       // No conflicts without offline sync
@@ -54,7 +66,7 @@ export default function AdminConflictsPage() {
       resolution: 'client' | 'server' | 'manual';
       useClientData?: boolean;
     }) => {
-      const conflict = conflicts.find((c: any) => c.id === conflictId);
+      const conflict = conflicts.find((c) => c.id === conflictId);
       if (!conflict) throw new Error('Conflict not found');
 
       if (resolution === 'client') {
@@ -79,7 +91,7 @@ export default function AdminConflictsPage() {
     },
   });
 
-  const handleResolve = (conflict: any, resolution: 'client' | 'server' | 'manual') => {
+  const handleResolve = async (conflict: Conflict, resolution: 'client' | 'server' | 'manual') => {
     setSelectedConflict(conflict);
     setResolveDialogOpen(true);
     
@@ -103,7 +115,7 @@ export default function AdminConflictsPage() {
     // Then mark conflict as resolved
     try {
       await resolveConflictMutation.mutateAsync({
-        conflictId: selectedConflict.id,
+        conflictId: selectedConflict!.id,
         resolution: 'manual',
       });
     } catch (error) {
@@ -304,6 +316,7 @@ export default function AdminConflictsPage() {
             variant="contained"
             color="success"
             onClick={async () => {
+              if (!selectedConflict) return;
               try {
                 await resolveConflictMutation.mutateAsync({
                   conflictId: selectedConflict.id,
@@ -322,6 +335,7 @@ export default function AdminConflictsPage() {
             variant="contained"
             color="info"
             onClick={async () => {
+              if (!selectedConflict) return;
               try {
                 await resolveConflictMutation.mutateAsync({
                   conflictId: selectedConflict.id,

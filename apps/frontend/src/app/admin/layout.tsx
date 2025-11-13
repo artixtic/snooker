@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -15,6 +15,8 @@ import {
   Typography,
   Container,
   Avatar,
+  Button,
+  IconButton,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import InventoryIcon from '@mui/icons-material/Inventory';
@@ -29,15 +31,36 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import ListAltIcon from '@mui/icons-material/ListAlt';
+import TableChartIcon from '@mui/icons-material/TableChart';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/auth-guard';
+import { Chip } from '@mui/material';
+import { DataTableDialog } from '@/components/data-table-dialog';
 
 const drawerWidth = 240;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [dataTableDialogOpen, setDataTableDialogOpen] = useState(false);
+
+  useEffect(() => {
+    // Check if user is admin - role is stored as 'ADMIN' (uppercase) in database
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        // Debug: log the role to help troubleshoot
+        console.log('User role from token:', payload.role);
+        setIsAdmin(payload.role === 'ADMIN');
+      } catch (error) {
+        console.error('Error decoding token:', error);
+        setIsAdmin(false);
+      }
+    }
+  }, []);
 
   const handleLogout = async () => {
     const { clearAllData } = await import('@/lib/logout-utils');
@@ -59,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { text: 'Activity Logs', icon: <HistoryIcon />, path: '/admin/activity-logs' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/admin/reports' },
     { text: 'Conflicts', icon: <SyncProblemIcon />, path: '/admin/conflicts' },
+    { text: 'Data Table', icon: <TableChartIcon />, path: '/admin/data-table' },
   ];
 
   return (
@@ -72,6 +96,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
               Admin Panel
             </Typography>
+            {isAdmin && (
+              <Button
+                variant="contained"
+                startIcon={<TableChartIcon />}
+                onClick={() => setDataTableDialogOpen(true)}
+                sx={{
+                  mr: 2,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                  },
+                }}
+              >
+                Data Table
+              </Button>
+            )}
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, gap: 1.5 }}>
               <Avatar
                 sx={{
@@ -174,6 +214,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </Box>
       </Box>
+      <DataTableDialog
+        open={dataTableDialogOpen}
+        onClose={() => setDataTableDialogOpen(false)}
+      />
     </AuthGuard>
   );
 }

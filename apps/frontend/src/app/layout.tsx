@@ -25,15 +25,34 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               // Unregister any existing service workers
-              if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for(var i = 0; i < registrations.length; i++) {
-                    registrations[i].unregister();
+              // Suppress Electron service worker storage errors
+              if (typeof window !== 'undefined') {
+                const originalConsoleError = console.error;
+                console.error = function(...args) {
+                  // Suppress Electron service worker storage errors
+                  if (args[0] && typeof args[0] === 'string' && 
+                      (args[0].includes('service_worker_storage') || 
+                       args[0].includes('Failed to delete the database'))) {
+                    return; // Silently ignore
                   }
-                });
-                navigator.serviceWorker.unregister('/sw.js').catch(function() {
-                  // Ignore errors - service worker might not exist
-                });
+                  originalConsoleError.apply(console, args);
+                };
+              }
+              
+              if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+                try {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(var i = 0; i < registrations.length; i++) {
+                      registrations[i].unregister().catch(function() {
+                        // Ignore errors - service worker might not exist
+                      });
+                    }
+                  }).catch(function() {
+                    // Ignore errors - service worker API might not be fully available
+                  });
+                } catch(e) {
+                  // Silently ignore any errors during service worker cleanup
+                }
               }
             `,
           }}

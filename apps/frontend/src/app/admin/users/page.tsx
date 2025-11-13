@@ -36,7 +36,12 @@ import { UserRole } from '@prisma/client';
 export default function AdminUsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    username: string;
+    password: string;
+    name: string;
+    role: UserRole;
+  }>({
     username: '',
     password: '',
     name: '',
@@ -115,7 +120,7 @@ export default function AdminUsersPage() {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const data: any = {
       username: formData.username,
       name: formData.name,
@@ -242,7 +247,10 @@ export default function AdminUsersPage() {
               <InputLabel>Role</InputLabel>
               <Select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                onChange={(e) => {
+                  const value = e.target.value as UserRole;
+                  setFormData({ ...formData, role: value });
+                }}
                 label="Role"
               >
                 <MenuItem value={UserRole.EMPLOYEE}>Employee</MenuItem>

@@ -250,7 +250,7 @@ export default function MatchesPage() {
                         variant="outlined"
                         color="error"
                         startIcon={<Stop />}
-                        onClick={() => {
+                        onClick={async () => {
                           const finalScores: any = {};
                           match.players.forEach((p) => {
                             if (p.playerId) {
@@ -298,7 +298,7 @@ export default function MatchesPage() {
           <CreateMatchForm
             tables={tables}
             users={users}
-            onSubmit={async (data) => {
+            onSubmit={async (data: any) => {
               try {
                 await createMatchMutation.mutateAsync(data);
               } catch (error) {
@@ -316,7 +316,7 @@ export default function MatchesPage() {
           {selectedMatch && (
             <UpdateScoreForm
               match={selectedMatch}
-              onSubmit={async (score) => {
+              onSubmit={async (score: any) => {
                 try {
                   await updateScoreMutation.mutateAsync({ id: selectedMatch.id, score });
                 } catch (error) {

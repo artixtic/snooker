@@ -69,7 +69,7 @@ export default function AdminDashboard() {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Today's Sales
+                Today&apos;s Sales
               </Typography>
               <Typography variant="h4">
                 ${dailyReport?.totalSales?.toFixed(2) || '0.00'}

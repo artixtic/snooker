@@ -8,8 +8,8 @@ let backendProcess: ChildProcess | null = null;
 let frontendProcess: ChildProcess | null = null;
 
 const isDev = process.env.NODE_ENV !== 'production';
-const API_URL = isDev ? 'http://localhost:3001' : 'http://localhost:3001';
-const FRONTEND_URL = isDev ? 'http://localhost:3000' : `file://${path.join(__dirname, '../frontend/dist/index.html')}`;
+const API_URL = isDev ? 'http://localhost:3001' : 'http://localhost:4001';
+const FRONTEND_URL = isDev ? 'http://localhost:3000' : 'http://localhost:4000';
 
 function createWindow() {
   const mainWindow = new BrowserWindow({

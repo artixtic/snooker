@@ -244,10 +244,12 @@ export class ShiftsService {
         productSales[item.productId].quantity += item.quantity;
         productSales[item.productId].revenue += Number(item.subtotal);
         
-        // Calculate profit: (unitPrice - cost) * quantity
-        const unitPrice = Number(item.unitPrice);
+        // Calculate profit: revenue (subtotal) - cost
+        // Use subtotal as it's the actual revenue received (may include discounts)
+        const revenue = Number(item.subtotal);
         const productCost = item.product?.cost ? Number(item.product.cost) : 0;
-        const itemProfit = (unitPrice - productCost) * item.quantity;
+        const itemCost = productCost * item.quantity;
+        const itemProfit = revenue - itemCost;
         productSales[item.productId].profit += itemProfit;
         totalProductProfit += itemProfit;
       });
@@ -269,8 +271,9 @@ export class ShiftsService {
     });
     const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
     
-    // Total profit = Product profit - Expenses
-    const totalProfit = totalProductProfit - totalExpenses;
+    // Total profit = Product profit + Table earnings (pure profit) - Expenses
+    // Table earnings are pure profit with no cost
+    const totalProfit = totalProductProfit + snookerTotal - totalExpenses;
 
     return {
       shiftId: shift.id,

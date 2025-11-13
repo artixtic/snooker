@@ -203,7 +203,7 @@ export function TableTimer({
 
   const handlePause = async () => {
     try {
-      await pauseTableMutation.mutateAsync();
+      await pauseTableMutation.mutateAsync(undefined);
     } catch (error) {
       console.error('Failed to pause table:', error);
     }
@@ -211,7 +211,7 @@ export function TableTimer({
 
   const handleResume = async () => {
     try {
-      await resumeTableMutation.mutateAsync();
+      await resumeTableMutation.mutateAsync(undefined);
     } catch (error) {
       console.error('Failed to resume table:', error);
     }
@@ -220,7 +220,7 @@ export function TableTimer({
   const handleStop = async () => {
     if (confirm(`Stop table ${tableNumber}? Current charge: $${currentCharge.toFixed(2)}`)) {
       try {
-        await stopTableMutation.mutateAsync();
+        await stopTableMutation.mutateAsync(undefined);
       } catch (error) {
         console.error('Failed to stop table:', error);
       }

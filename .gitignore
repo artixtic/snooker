@@ -28,6 +28,9 @@ out/
 .env.test.local
 .env.production.local
 .env.*.local
+# Allow template files (they should be committed)
+!.env*.template
+!.env.template
 
 # IDE and editors
 .vscode/

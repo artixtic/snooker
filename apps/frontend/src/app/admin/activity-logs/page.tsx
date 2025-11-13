@@ -62,7 +62,7 @@ export default function AdminActivityLogsPage() {
     }
   };
 
-  const entities = Array.from(new Set(logs.map((log: any) => log.entity))).filter(Boolean);
+  const entities = Array.from(new Set(logs.map((log: any) => log.entity))).filter(Boolean) as string[];
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -193,4 +193,3 @@ export default function AdminActivityLogsPage() {
     </Container>
   );
 }
-

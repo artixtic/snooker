@@ -555,3 +555,52 @@ model TournamentMatch {
   @@index([tournamentId])
 }
 
+// Backup and Sync Management
+model BackupHistory {
+  id            String   @id @default(cuid())
+  backupType    String   // 'FULL', 'INCREMENTAL', 'MANUAL'
+  status        String   // 'SUCCESS', 'FAILED', 'IN_PROGRESS'
+  recordCount   Int      @default(0)
+  duration      Int?     // Duration in milliseconds
+  size          BigInt?  // Backup size in bytes
+  filePath      String?  // Path to backup file if exported
+  error         String?  @db.Text
+  createdAt     DateTime @default(now())
+  
+  @@map("backup_history")
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SyncState {
+  id            String   @id @default(cuid())
+  entity        String   // Table name
+  entityId      String   // Record ID
+  mainUpdatedAt DateTime // Last update time in main DB
+  backupUpdatedAt DateTime // Last update time in backup DB
+  lastSyncedAt  DateTime @default(now())
+  syncDirection String?  // 'MAIN_TO_BACKUP', 'BACKUP_TO_MAIN', 'BOTH'
+  conflict      Boolean  @default(false)
+  conflictData  Json?    // Conflict details if any
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("sync_state")
+  @@unique([entity, entityId])
+  @@index([entity])
+  @@index([lastSyncedAt])
+  @@index([conflict])
+}
+
+model BackupConfig {
+  id                    String   @id @default(cuid())
+  key                   String   @unique
+  value                 String   @db.Text
+  description           String?  @db.Text
+  updatedAt             DateTime @updatedAt
+  updatedBy             String?
+  
+  @@map("backup_config")
+}
+

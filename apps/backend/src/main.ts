@@ -6,16 +6,19 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   try {
+    const isProduction = process.env.NODE_ENV === 'production';
     const app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+      logger: isProduction 
+        ? ['error', 'warn', 'log'] 
+        : ['error', 'warn', 'log', 'debug', 'verbose'],
     });
 
     // Cookie parser for refresh tokens
     app.use(cookieParser());
 
     const configService = app.get(ConfigService);
-    const port = configService.get('PORT') || 3001;
-    const corsOrigin = configService.get('CORS_ORIGIN') || 'http://localhost:3000';
+    const port = configService.get('PORT') || process.env.PORT || 3001;
+    const corsOrigin = configService.get('CORS_ORIGIN') || process.env.CORS_ORIGIN || 'http://localhost:3000';
 
     // Enable CORS for frontend
     app.enableCors({

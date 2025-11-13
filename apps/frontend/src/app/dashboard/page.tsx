@@ -69,6 +69,7 @@ interface Table {
   lastResumedAt: string | null;
   totalPausedMs: number | null;
   currentCharge: number;
+  gameId?: string | null;
 }
 
 interface CartItem {
@@ -117,12 +118,6 @@ export default function DashboardPage() {
     initialData: () => dataCache.get(CACHE_KEYS.GAMES) || undefined,
     retry: false, // Don't retry - fail fast
     staleTime: 30000, // Consider data fresh for 30 seconds
-    onError: (error: any) => {
-      // API interceptor handles 401 redirects, but log other errors
-      if (error?.response?.status !== 401) {
-        console.error('Games query error:', error);
-      }
-    },
   });
 
   // Fetch tables
@@ -139,12 +134,6 @@ export default function DashboardPage() {
     },
     retry: false, // Don't retry - fail fast
     staleTime: 5000, // Consider data fresh for 5 seconds
-    onError: (error: any) => {
-      // API interceptor handles 401 redirects, but log other errors
-      if (error?.response?.status !== 401) {
-        console.error('Tables query error:', error);
-      }
-    },
   });
   
   // Only show loading if we're actually loading (not in error state)
@@ -172,12 +161,6 @@ export default function DashboardPage() {
     },
     initialData: () => dataCache.get(CACHE_KEYS.SHIFTS) || undefined,
     retry: false, // Don't retry - fail fast
-    onError: (error: any) => {
-      // API interceptor handles 401 redirects, but log other errors
-      if (error?.response?.status !== 401) {
-        console.error('Shifts query error:', error);
-      }
-    },
   });
 
   const activeShift = shifts?.find((shift: any) => shift.status === 'ACTIVE');
@@ -2089,7 +2072,7 @@ function CheckoutDialog({ open, onClose, table, onCheckout, cartItems = [], game
       setTaxEnabled(true);
       setAmount(0);
     }
-  }, [open, table?.id, table?.status, table?.currentCharge]);
+  }, [open, table]);
 
   const tableCharge = Math.ceil(frozenCharge); // Round up table charge
   

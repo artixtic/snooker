@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"app\\\\dashboard\\\\page.tsx -> @/lib/logout-utils\":{\"id\":\"app\\\\dashboard\\\\page.tsx -> @/lib/logout-utils\",\"files\":[\"static/chunks/_app-pages-browser_src_lib_logout-utils_ts.js\"]},\"components\\\\auth-guard.tsx -> @/lib/logout-utils\":{\"id\":\"components\\\\auth-guard.tsx -> @/lib/logout-utils\",\"files\":[\"static/chunks/_app-pages-browser_src_lib_logout-utils_ts.js\"]}}"

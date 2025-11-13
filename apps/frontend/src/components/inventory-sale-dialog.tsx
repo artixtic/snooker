@@ -148,7 +148,7 @@ export function InventorySaleDialog({ open, onClose }: InventorySaleDialogProps)
     if (total > 0 && paymentAmount === 0) {
       setPaymentAmount(total);
     }
-  }, [total]);
+  }, [total, paymentAmount]);
 
   // Create sale mutation
   const createSaleMutation = useMutation({

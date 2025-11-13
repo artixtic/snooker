@@ -12,13 +12,20 @@
     "dev:frontend": "npm run dev --workspace=apps/frontend",
     "dev:electron": "npm run dev --workspace=apps/electron",
     "build": "npm run build --workspace=apps/frontend && npm run build --workspace=apps/backend",
+    "build:prod": "npm run build:prod --workspace=apps/backend && npm run build:prod --workspace=apps/frontend",
     "build:electron": "npm run build:electron --workspace=apps/electron",
+    "start:prod": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run start:prod --workspace=apps/backend\" \"npm run start:prod --workspace=apps/frontend\"",
+    "prod": "npm run build:prod && npm run build --workspace=apps/electron && npm run start:prod:all",
+    "start:prod:all": "npm run build:prod && npm run build --workspace=apps/electron && concurrently -n \"backend,frontend,electron\" -c \"blue,green,yellow\" \"npm run start:prod --workspace=apps/backend\" \"npm run start:prod --workspace=apps/frontend\" \"npm run prod --workspace=apps/electron\"",
+    "prod:backend": "npm run build:prod --workspace=apps/backend && npm run start:prod --workspace=apps/backend",
+    "prod:frontend": "npm run build:prod --workspace=apps/frontend && npm run start:prod --workspace=apps/frontend",
+    "prod:electron": "npm run build --workspace=apps/electron && npm run prod --workspace=apps/electron",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
     "typescript": "^5.3.3"
   }
 }
-
