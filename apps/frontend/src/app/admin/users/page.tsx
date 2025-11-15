@@ -234,7 +234,6 @@ export default function AdminUsersPage() {
               required
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              disabled={!!editingUser} // Can't change username
             />
             <TextField
               label="Name"

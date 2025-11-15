@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TablesService } from './tables.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StartTableDto } from './dto/start-table.dto';
 
 describe('TablesService', () => {
   let service: TablesService;
@@ -21,6 +22,9 @@ describe('TablesService', () => {
     },
     sale: {
       create: jest.fn(),
+    },
+    shift: {
+      findFirst: jest.fn(),
     },
   };
 
@@ -102,7 +106,7 @@ describe('TablesService', () => {
   describe('start', () => {
     it('should start an available table', async () => {
       const tableId = '1';
-      const dto = { memberId: null };
+      const dto: StartTableDto = {};
       const employeeId = 'emp1';
       const mockTable = {
         id: tableId,
@@ -126,7 +130,7 @@ describe('TablesService', () => {
 
     it('should throw NotFoundException when table not found', async () => {
       const tableId = '1';
-      const dto = { memberId: null };
+      const dto: StartTableDto = {};
       const employeeId = 'emp1';
 
       mockPrismaService.tableSession.findUnique.mockResolvedValue(null);
@@ -136,7 +140,7 @@ describe('TablesService', () => {
 
     it('should throw BadRequestException when no active shift', async () => {
       const tableId = '1';
-      const dto = { memberId: null };
+      const dto: StartTableDto = {};
       const employeeId = 'emp1';
       const mockTable = {
         id: tableId,
@@ -153,7 +157,7 @@ describe('TablesService', () => {
 
     it('should return table when already occupied (idempotent)', async () => {
       const tableId = '1';
-      const dto = { memberId: null };
+      const dto: StartTableDto = {};
       const employeeId = 'emp1';
       const mockTable = {
         id: tableId,

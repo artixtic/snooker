@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentMethod } from '@prisma/client';
 
 describe('SalesService', () => {
   let service: SalesService;
@@ -57,7 +58,7 @@ describe('SalesService', () => {
         ],
         subtotal: 20,
         total: 20,
-        paymentMethod: 'CASH',
+        paymentMethod: PaymentMethod.CASH,
       };
       const employeeId = 'emp1';
       const mockProduct = {
@@ -108,7 +109,7 @@ describe('SalesService', () => {
         ],
         subtotal: 20,
         total: 20,
-        paymentMethod: 'CASH',
+        paymentMethod: PaymentMethod.CASH,
       };
       const employeeId = 'emp1';
 
@@ -140,7 +141,7 @@ describe('SalesService', () => {
         ],
         subtotal: 2000,
         total: 2000,
-        paymentMethod: 'CASH',
+        paymentMethod: PaymentMethod.CASH,
       };
       const employeeId = 'emp1';
       const mockProduct = {
@@ -170,7 +171,7 @@ describe('SalesService', () => {
       const createDto = {
         subtotal: 100,
         total: 100,
-        paymentMethod: 'CASH',
+        paymentMethod: PaymentMethod.CASH,
         tableId: 'table1',
       };
       const employeeId = 'emp1';

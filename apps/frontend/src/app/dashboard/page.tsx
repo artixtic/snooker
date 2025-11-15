@@ -46,6 +46,7 @@ import {
   ExpandMore,
   ExpandLess,
   ShoppingCart,
+  People,
 } from '@mui/icons-material';
 import api from '@/lib/api';
 import { TableHistoryDialog } from '@/components/table-history-dialog';
@@ -57,7 +58,9 @@ import { CustomReportsDialog } from '@/components/custom-reports-dialog';
 import { ShiftModal } from '@/components/shift-modal';
 import { GamesDialog } from '@/components/games-dialog';
 import { InventorySaleDialog } from '@/components/inventory-sale-dialog';
+import { UsersDialog } from '@/components/users-dialog';
 import { dataCache, CACHE_KEYS } from '@/lib/data-cache';
+import { useAuth } from '@/hooks/use-auth';
 
 interface Table {
   id: string;
@@ -94,9 +97,9 @@ export default function DashboardPage() {
   const [startTableDialogOpen, setStartTableDialogOpen] = useState(false);
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [createTableDialogOpen, setCreateTableDialogOpen] = useState(false);
-  const [deleteAllTablesDialogOpen, setDeleteAllTablesDialogOpen] = useState(false);
   const [gamesDialogOpen, setGamesDialogOpen] = useState(false);
   const [inventorySaleDialogOpen, setInventorySaleDialogOpen] = useState(false);
+  const [usersDialogOpen, setUsersDialogOpen] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState(1);
   const [selectedGameId, setSelectedGameId] = useState<string>('');
   const [ratePerMinute, setRatePerMinute] = useState(8); // Default rate: 8 PKR/min
@@ -106,6 +109,8 @@ export default function DashboardPage() {
   const [tableCartItems, setTableCartItems] = useState<Record<string, CartItem[]>>({}); // Store cart items per table
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({}); // Track expanded cards
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isEmployee = user?.role === 'EMPLOYEE';
 
   // Fetch games
   // Note: AuthGuard in layout handles authentication, but we still handle 401 errors from API calls
@@ -161,8 +166,10 @@ export default function DashboardPage() {
     },
     initialData: () => dataCache.get(CACHE_KEYS.SHIFTS) || undefined,
     retry: false, // Don't retry - fail fast
+    refetchInterval: 10000, // Refetch every 10 seconds to keep shift status updated
   });
 
+  // Get any active shift (admin starts shift, employees can see it and use it)
   const activeShift = shifts?.find((shift: any) => shift.status === 'ACTIVE');
 
   // Auto-expand cards when they become occupied
@@ -410,20 +417,6 @@ export default function DashboardPage() {
     },
   });
 
-  const deleteAllTablesMutation = useMutation({
-    mutationFn: async () => {
-      const response = await api.delete('/tables/all');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
-      setDeleteAllTablesDialogOpen(false);
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete tables';
-      alert(errorMessage);
-    },
-  });
 
   const pauseTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
@@ -1194,7 +1187,24 @@ export default function DashboardPage() {
           <Typography variant="body2" sx={{ mr: 2 }}>
             +92 316 1126671
           </Typography>
-          {!activeShift && (
+          {/* Shift Status Notification for Employees */}
+          {isEmployee && (
+            <Chip
+              icon={activeShift ? <CheckCircle /> : undefined}
+              label={activeShift ? 'Shift Active' : 'No Active Shift'}
+              color={activeShift ? 'success' : 'warning'}
+              sx={{
+                mr: 2,
+                fontWeight: 'bold',
+                fontSize: '0.875rem',
+                height: '32px',
+                boxShadow: activeShift 
+                  ? '0 2px 8px rgba(76, 175, 80, 0.4)' 
+                  : '0 2px 8px rgba(255, 152, 0, 0.4)',
+              }}
+            />
+          )}
+          {!activeShift && !isEmployee && (
             <Button
               variant="contained"
               size="small"
@@ -1216,114 +1226,159 @@ export default function DashboardPage() {
               Start Shift
             </Button>
           )}
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Add />}
-            onClick={() => setGamesDialogOpen(true)}
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
-              boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #7B1FA2 30%, #9C27B0 90%)',
-                boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
-              }
-            }}
-          >
-            Manage Games
-          </Button>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Add />}
-            onClick={() => {
-              // Find the next available table number
-              const maxTableNumber = tables.length > 0 
-                ? Math.max(...tables.map((t: Table) => t.tableNumber))
-                : 0;
-              setNewTableNumber(maxTableNumber + 1);
-              setCreateTableDialogOpen(true);
-            }}
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
-              boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
-                boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-              }
-            }}
-          >
-            New Table
-          </Button>
-          {tables.length > 0 && (
-            <Button
+          {/* Admin-only buttons */}
+          {!isEmployee && (
+            <>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<Add />}
+                onClick={() => setGamesDialogOpen(true)}
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
+                  boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #7B1FA2 30%, #9C27B0 90%)',
+                    boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
+                  }
+                }}
+              >
+                Manage Games
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<Add />}
+                onClick={() => {
+                  // Find the next available table number
+                  const maxTableNumber = tables.length > 0 
+                    ? Math.max(...tables.map((t: Table) => t.tableNumber))
+                    : 0;
+                  setNewTableNumber(maxTableNumber + 1);
+                  setCreateTableDialogOpen(true);
+                }}
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                  boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                    boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                  }
+                }}
+              >
+                New Table
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<Assessment />}
+                onClick={(e) => setAddonsAnchor(e.currentTarget)}
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)',
+                  boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #0097A7 30%, #00BCD4 90%)',
+                    boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
+                  }
+                }}
+              >
+                Reports
+              </Button>
+              <Button 
+                variant="contained"
+                size="small"
+                onClick={() => setExpenseDialogOpen(true)} 
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
+                  boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #7B1FA2 30%, #9C27B0 90%)',
+                    boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
+                  }
+                }}
+              >
+                Expense
+              </Button>
+              <Button 
+                variant="contained"
+                size="small"
+                onClick={() => setReportsDialogOpen(true)} 
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)',
+                  boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #0097A7 30%, #00BCD4 90%)',
+                    boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
+                  }
+                }}
+              >
+                Closing
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<People />}
+                onClick={() => setUsersDialogOpen(true)}
+                sx={{ 
+                  mr: 1,
+                  py: 0.5,
+                  px: 1.5,
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(45deg, #4CAF50 30%, #45a049 90%)',
+                  boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #45a049 30%, #4CAF50 90%)',
+                    boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
+                  }
+                }}
+              >
+                Users
+              </Button>
+            </>
+          )}
+          {/* Inventory button - Admin only */}
+          {!isEmployee && (
+            <Button 
               variant="contained"
               size="small"
-              startIcon={<Remove />}
-              onClick={() => setDeleteAllTablesDialogOpen(true)}
+              onClick={() => setInventoryDialogOpen(true)} 
               sx={{ 
                 mr: 1,
                 py: 0.5,
                 px: 1.5,
                 fontSize: '0.85rem',
-                background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-                boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
+                background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
+                boxShadow: '0 4px 15px rgba(33, 150, 243, 0.4)',
                 '&:hover': {
-                  background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
-                  boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
+                  background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
+                  boxShadow: '0 6px 20px rgba(33, 150, 243, 0.6)',
                 }
               }}
             >
-              Delete All
+              Inventory
             </Button>
           )}
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Assessment />}
-            onClick={(e) => setAddonsAnchor(e.currentTarget)}
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)',
-              boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #0097A7 30%, #00BCD4 90%)',
-                boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
-              }
-            }}
-          >
-            Reports
-          </Button>
-          <Button 
-            variant="contained"
-            size="small"
-            onClick={() => setInventoryDialogOpen(true)} 
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #2196F3 30%, #1976D2 90%)',
-              boxShadow: '0 4px 15px rgba(33, 150, 243, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
-                boxShadow: '0 6px 20px rgba(33, 150, 243, 0.6)',
-              }
-            }}
-          >
-            Inventory
-          </Button>
+          {/* Sales button - Available for all users */}
           <Button 
             variant="contained"
             size="small"
@@ -1342,45 +1397,7 @@ export default function DashboardPage() {
               }
             }}
           >
-            Inventory Sale
-          </Button>
-          <Button 
-            variant="contained"
-            size="small"
-            onClick={() => setExpenseDialogOpen(true)} 
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #9C27B0 30%, #7B1FA2 90%)',
-              boxShadow: '0 4px 15px rgba(156, 39, 176, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #7B1FA2 30%, #9C27B0 90%)',
-                boxShadow: '0 6px 20px rgba(156, 39, 176, 0.6)',
-              }
-            }}
-          >
-            Expense
-          </Button>
-          <Button 
-            variant="contained"
-            size="small"
-            onClick={() => setReportsDialogOpen(true)} 
-            sx={{ 
-              mr: 1,
-              py: 0.5,
-              px: 1.5,
-              fontSize: '0.85rem',
-              background: 'linear-gradient(45deg, #00BCD4 30%, #0097A7 90%)',
-              boxShadow: '0 4px 15px rgba(0, 188, 212, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #0097A7 30%, #00BCD4 90%)',
-                boxShadow: '0 6px 20px rgba(0, 188, 212, 0.6)',
-              }
-            }}
-          >
-            Closing
+            Sales
           </Button>
           <Button 
             variant="contained"
@@ -1580,47 +1597,49 @@ export default function DashboardPage() {
                     );
                   })}
                   
-                  {/* Create Table Card - Always at the end, even if no tables exist */}
-                  <Card
-                    sx={{
-                      background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                      color: 'white',
-                      borderRadius: 2,
-                      minHeight: 100,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(17, 153, 142, 0.3)',
-                      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                      border: '2px dashed rgba(255, 255, 255, 0.3)',
-                      width: '100%',
-                      mt: 'auto', // Push to bottom
-                      '&:hover': {
-                        transform: 'translateY(-4px) scale(1.02)',
-                        boxShadow: '0 8px 25px rgba(17, 153, 142, 0.5)',
-                        background: 'linear-gradient(135deg, #38ef7d 0%, #11998e 100%)',
-                        border: '2px dashed rgba(255, 255, 255, 0.5)',
-                      },
-                    }}
-                    onClick={() => {
-                      // Find the next available table number for this game
-                      const gameTableNumbers = gameTables.map((t: Table) => t.tableNumber);
-                      const maxTableNumber = gameTableNumbers.length > 0 
-                        ? Math.max(...gameTableNumbers)
-                        : 0;
-                      setNewTableNumber(maxTableNumber + 1);
-                      setSelectedGameId(game.id); // Pre-select this game
-                      setCreateTableDialogOpen(true);
-                    }}
-                  >
-                    <CardContent sx={{ textAlign: 'center', py: 1.5, px: 2 }}>
-                      <Add sx={{ fontSize: 28, mb: 0.5, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
-                      <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.85rem' }}>
-                        Create Table
-                      </Typography>
-                    </CardContent>
-                  </Card>
+                  {/* Create Table Card - Admin only */}
+                  {!isEmployee && (
+                    <Card
+                      sx={{
+                        background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                        color: 'white',
+                        borderRadius: 2,
+                        minHeight: 100,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(17, 153, 142, 0.3)',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                        border: '2px dashed rgba(255, 255, 255, 0.3)',
+                        width: '100%',
+                        mt: 'auto', // Push to bottom
+                        '&:hover': {
+                          transform: 'translateY(-4px) scale(1.02)',
+                          boxShadow: '0 8px 25px rgba(17, 153, 142, 0.5)',
+                          background: 'linear-gradient(135deg, #38ef7d 0%, #11998e 100%)',
+                          border: '2px dashed rgba(255, 255, 255, 0.5)',
+                        },
+                      }}
+                      onClick={() => {
+                        // Find the next available table number for this game
+                        const gameTableNumbers = gameTables.map((t: Table) => t.tableNumber);
+                        const maxTableNumber = gameTableNumbers.length > 0 
+                          ? Math.max(...gameTableNumbers)
+                          : 0;
+                        setNewTableNumber(maxTableNumber + 1);
+                        setSelectedGameId(game.id); // Pre-select this game
+                        setCreateTableDialogOpen(true);
+                      }}
+                    >
+                      <CardContent sx={{ textAlign: 'center', py: 1.5, px: 2 }}>
+                        <Add sx={{ fontSize: 28, mb: 0.5, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                        <Typography variant="body1" fontWeight="bold" sx={{ fontSize: '0.85rem' }}>
+                          Create Table
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  )}
                 </Box>
               </Box>
             );
@@ -1720,6 +1739,12 @@ export default function DashboardPage() {
       <GamesDialog
         open={gamesDialogOpen}
         onClose={() => setGamesDialogOpen(false)}
+      />
+
+      {/* Users Dialog */}
+      <UsersDialog
+        open={usersDialogOpen}
+        onClose={() => setUsersDialogOpen(false)}
       />
 
       {/* Create Table Dialog */}
@@ -1841,91 +1866,6 @@ export default function DashboardPage() {
             }}
           >
             ✨ Create Table
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete All Tables Dialog */}
-      <Dialog 
-        open={deleteAllTablesDialogOpen} 
-        onClose={() => setDeleteAllTablesDialogOpen(false)} 
-        maxWidth="md" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          }
-        }}
-      >
-        <DialogTitle 
-          sx={{ 
-            background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '1.3rem',
-            py: 2,
-          }}
-        >
-          ⚠️ Delete All Tables
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Are you sure you want to delete all available tables? This will only delete tables that are not currently in use.
-          </Typography>
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: 2, 
-            bgcolor: 'rgba(244, 67, 54, 0.1)',
-            border: '2px solid rgba(244, 67, 54, 0.3)',
-          }}>
-            <Typography variant="body2" sx={{ color: '#d32f2f', fontWeight: 'bold' }}>
-              ⚠️ Warning: This action cannot be undone. Tables that are currently occupied or paused will not be deleted.
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 2.5, background: 'rgba(255, 255, 255, 0.5)' }}>
-          <Button 
-            onClick={() => setDeleteAllTablesDialogOpen(false)}
-            sx={{
-              borderRadius: 2,
-              px: 3,
-              fontWeight: 'bold',
-              color: '#666',
-              '&:hover': {
-                bgcolor: 'rgba(0, 0, 0, 0.05)',
-              },
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={async () => {
-              try {
-                await deleteAllTablesMutation.mutateAsync();
-              } catch (error) {
-                console.error('Failed to delete all tables:', error);
-              }
-            }}
-            disabled={deleteAllTablesMutation.isPending}
-            sx={{
-              borderRadius: 2,
-              px: 4,
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #f44336 30%, #d32f2f 90%)',
-              boxShadow: '0 4px 15px rgba(244, 67, 54, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #d32f2f 30%, #f44336 90%)',
-                boxShadow: '0 6px 20px rgba(244, 67, 54, 0.6)',
-              },
-              '&:disabled': {
-                background: 'rgba(0, 0, 0, 0.2)',
-              },
-            }}
-          >
-            🗑️ Delete All Available Tables
           </Button>
         </DialogActions>
       </Dialog>

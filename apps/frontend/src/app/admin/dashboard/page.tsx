@@ -41,11 +41,22 @@ export default function AdminDashboard() {
   });
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 2 }}>
       <LowStockAlert />
       
-      <Typography variant="h4" gutterBottom>
-        Dashboard
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{
+          mb: 4,
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}
+      >
+        Dashboard Overview
       </Typography>
 
       {lowStockProducts.length > 0 && (
@@ -65,52 +76,148 @@ export default function AdminDashboard() {
 
       <Grid container spacing={3}>
         {/* Sales Summary */}
-        <Grid item xs={12} md={3}>
-          <Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              boxShadow: '0 8px 24px rgba(102, 126, 234, 0.3)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 32px rgba(102, 126, 234, 0.4)',
+              },
+            }}
+          >
             <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+              <Typography 
+                sx={{ 
+                  opacity: 0.9, 
+                  mb: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                }}
+              >
                 Today&apos;s Sales
               </Typography>
-              <Typography variant="h4">
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 700,
+                  fontSize: '2rem',
+                }}
+              >
                 ${dailyReport?.totalSales?.toFixed(2) || '0.00'}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={3}>
-          <Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              color: 'white',
+              boxShadow: '0 8px 24px rgba(245, 87, 108, 0.3)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 32px rgba(245, 87, 108, 0.4)',
+              },
+            }}
+          >
             <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+              <Typography 
+                sx={{ 
+                  opacity: 0.9, 
+                  mb: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                }}
+              >
                 Transactions
               </Typography>
-              <Typography variant="h4">
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 700,
+                  fontSize: '2rem',
+                }}
+              >
                 {dailyReport?.saleCount || 0}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={3}>
-          <Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              color: 'white',
+              boxShadow: '0 8px 24px rgba(79, 172, 254, 0.3)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 32px rgba(79, 172, 254, 0.4)',
+              },
+            }}
+          >
             <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+              <Typography 
+                sx={{ 
+                  opacity: 0.9, 
+                  mb: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                }}
+              >
                 Cash
               </Typography>
-              <Typography variant="h4">
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 700,
+                  fontSize: '2rem',
+                }}
+              >
                 ${dailyReport?.totalCash?.toFixed(2) || '0.00'}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={3}>
-          <Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card
+            sx={{
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              color: 'white',
+              boxShadow: '0 8px 24px rgba(67, 233, 123, 0.3)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 32px rgba(67, 233, 123, 0.4)',
+              },
+            }}
+          >
             <CardContent>
-              <Typography color="textSecondary" gutterBottom>
+              <Typography 
+                sx={{ 
+                  opacity: 0.9, 
+                  mb: 1,
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                }}
+              >
                 Card
               </Typography>
-              <Typography variant="h4">
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 700,
+                  fontSize: '2rem',
+                }}
+              >
                 ${dailyReport?.totalCard?.toFixed(2) || '0.00'}
               </Typography>
             </CardContent>
@@ -119,8 +226,23 @@ export default function AdminDashboard() {
 
         {/* Top Products */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper 
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+              background: 'white',
+            }}
+          >
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{
+                fontWeight: 700,
+                mb: 3,
+                color: '#667eea',
+              }}
+            >
               Top Products Today
             </Typography>
             {dailyReport?.topProducts?.length > 0 ? (
@@ -151,14 +273,45 @@ export default function AdminDashboard() {
 
         {/* Table Usage */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper 
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+              border: '1px solid rgba(102, 126, 234, 0.1)',
+            }}
+          >
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{
+                fontWeight: 700,
+                mb: 3,
+                color: '#667eea',
+              }}
+            >
               Table Usage
             </Typography>
-            <Typography variant="h3" color="primary">
+            <Typography 
+              variant="h3" 
+              sx={{
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                mb: 1,
+              }}
+            >
               {dailyReport?.tableSessions || 0}
             </Typography>
-            <Typography color="textSecondary">Tables used today</Typography>
+            <Typography 
+              color="textSecondary"
+              sx={{ fontSize: '0.95rem' }}
+            >
+              Tables used today
+            </Typography>
           </Paper>
         </Grid>
       </Grid>

@@ -26,6 +26,9 @@ describe('EnhancedBackupService', () => {
       findUnique: jest.fn(),
       upsert: jest.fn(),
     },
+    product: {
+      findMany: jest.fn(),
+    },
   };
 
   const mockBackupPrisma = {
@@ -100,9 +103,7 @@ describe('EnhancedBackupService', () => {
         { id: '2', name: 'Product 2', stock: 50 },
       ];
 
-      mockPrismaService.product = {
-        findMany: jest.fn().mockResolvedValue(mockProducts),
-      };
+      mockPrismaService.product.findMany.mockResolvedValue(mockProducts);
       mockBackupPrisma.product.upsert.mockResolvedValue({});
 
       // Mock the getData methods
@@ -119,9 +120,9 @@ describe('EnhancedBackupService', () => {
     });
   });
 
-  describe('getBackupStats', () => {
-    it('should return backup statistics', async () => {
-      mockPrismaService.backupHistory.findMany.mockResolvedValue([
+  describe('getBackupHistory', () => {
+    it('should return backup history', async () => {
+      const mockHistory = [
         {
           id: '1',
           status: 'SUCCESS',
@@ -129,13 +130,15 @@ describe('EnhancedBackupService', () => {
           duration: 1000,
           size: BigInt(1024),
         },
-      ]);
+      ];
 
-      const stats = await service.getBackupStats();
+      mockPrismaService.backupHistory.findMany.mockResolvedValue(mockHistory);
 
-      expect(stats).toBeDefined();
-      expect(stats).toHaveProperty('totalBackups');
-      expect(stats).toHaveProperty('successfulBackups');
+      const history = await service.getBackupHistory();
+
+      expect(history).toBeDefined();
+      expect(history).toEqual(mockHistory);
+      expect(mockPrismaService.backupHistory.findMany).toHaveBeenCalled();
     });
   });
 });

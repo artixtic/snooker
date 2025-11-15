@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -66,6 +66,20 @@ export class UsersService {
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // Check if username is being updated and if it's already taken by another user
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          username: updateUserDto.username,
+          deleted: false,
+          NOT: { id },
+        },
+      });
+      if (existingUser) {
+        throw new ConflictException(`Username "${updateUserDto.username}" is already taken`);
+      }
     }
 
     const data: any = { ...updateUserDto };

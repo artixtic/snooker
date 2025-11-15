@@ -100,16 +100,15 @@ export class TablesService {
       return table;
     }
 
-    // Check if there's an active shift for this employee
+    // Check if there's any active shift (admin starts shift, employees can use it)
     const activeShift = await this.prisma.shift.findFirst({
       where: {
-        employeeId,
         status: 'ACTIVE',
       },
     });
 
     if (!activeShift) {
-      throw new BadRequestException('No active shift found. Please start a shift before checking in a table.');
+      throw new BadRequestException('No active shift found. Please ask admin to start a shift before checking in a table.');
     }
 
     // Get the rate - use provided rate, or table's current rate, or game's default rate, or fallback to 8

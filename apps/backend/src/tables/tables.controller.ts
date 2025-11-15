@@ -4,10 +4,13 @@ import { StartTableDto } from './dto/start-table.dto';
 import { StopTableDto } from './dto/stop-table.dto';
 import { CreateTableDto } from './dto/create-table.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('tables')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TablesController {
   constructor(private readonly tablesService: TablesService) {}
 
@@ -17,11 +20,13 @@ export class TablesController {
   }
 
   @Post()
+  @Roles(UserRole.ADMIN)
   create(@Body() createTableDto: CreateTableDto) {
     return this.tablesService.create(createTableDto);
   }
 
   @Delete('all')
+  @Roles(UserRole.ADMIN)
   removeAll() {
     return this.tablesService.removeAll();
   }
@@ -57,11 +62,13 @@ export class TablesController {
   }
 
   @Post(':id/reset')
+  @Roles(UserRole.ADMIN)
   reset(@Param('id') id: string) {
     return this.tablesService.reset(id);
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.tablesService.remove(id);
   }

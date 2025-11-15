@@ -90,27 +90,59 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Box sx={{ display: 'flex' }}>
         <AppBar
           position="fixed"
-          sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
+          sx={{ 
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+          }}
         >
           <Toolbar>
-            <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                flexGrow: 1,
+                fontWeight: 700,
+                fontSize: '1.5rem',
+                letterSpacing: 1,
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+              }}
+            >
               Admin Panel
             </Typography>
             {isAdmin && (
-              <Button
-                variant="contained"
-                startIcon={<TableChartIcon />}
-                onClick={() => setDataTableDialogOpen(true)}
-                sx={{
-                  mr: 2,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
-                  },
-                }}
-              >
-                Data Table
-              </Button>
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<PeopleIcon />}
+                  component={Link}
+                  href="/admin/users"
+                  sx={{
+                    mr: 2,
+                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #45a049 0%, #4CAF50 100%)',
+                    },
+                  }}
+                >
+                  Users
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<TableChartIcon />}
+                  onClick={() => setDataTableDialogOpen(true)}
+                  sx={{
+                    mr: 2,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                    },
+                  }}
+                >
+                  Data Table
+                </Button>
+              </>
             )}
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, gap: 1.5 }}>
               <Avatar
@@ -171,32 +203,87 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             '& .MuiDrawer-paper': {
               width: drawerWidth,
               boxSizing: 'border-box',
+              background: 'linear-gradient(180deg, #f5f7fa 0%, #c3cfe2 100%)',
+              borderRight: '1px solid rgba(102, 126, 234, 0.1)',
             },
           }}
         >
           <Toolbar />
-          <Box sx={{ overflow: 'auto' }}>
+          <Box sx={{ overflow: 'auto', pt: 2 }}>
             <List>
               {menuItems.map((item) => (
-                <ListItem key={item.text} disablePadding>
+                <ListItem key={item.text} disablePadding sx={{ mb: 0.5, px: 1 }}>
                   <ListItemButton
                     component={Link}
                     href={item.path}
                     selected={pathname === item.path}
+                    sx={{
+                      borderRadius: 2,
+                      py: 1.5,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                        transform: 'translateX(4px)',
+                      },
+                      '&.Mui-selected': {
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                          transform: 'translateX(4px)',
+                        },
+                        '& .MuiListItemIcon-root': {
+                          color: 'white',
+                        },
+                      },
+                    }}
                   >
-                    <ListItemIcon>{item.icon}</ListItemIcon>
-                    <ListItemText primary={item.text} />
+                    <ListItemIcon sx={{ 
+                      minWidth: 40,
+                      color: pathname === item.path ? 'white' : 'inherit',
+                    }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item.text}
+                      primaryTypographyProps={{
+                        fontWeight: pathname === item.path ? 600 : 500,
+                        fontSize: '0.95rem',
+                      }}
+                    />
                   </ListItemButton>
                 </ListItem>
               ))}
-              <ListItem disablePadding>
+              <ListItem disablePadding sx={{ mt: 2, px: 1 }}>
                 <ListItemButton 
                   onClick={handleLogout}
+                  sx={{
+                    borderRadius: 2,
+                    py: 1.5,
+                    background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
+                    color: 'white',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #ee5a6f 0%, #ff6b6b 100%)',
+                      transform: 'translateX(4px)',
+                      boxShadow: '0 4px 12px rgba(255, 107, 107, 0.4)',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'white',
+                    },
+                  }}
                 >
                   <ListItemIcon>
                     <LogoutIcon />
                   </ListItemIcon>
-                  <ListItemText primary="Logout" />
+                  <ListItemText 
+                    primary="Logout"
+                    primaryTypographyProps={{
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                    }}
+                  />
                 </ListItemButton>
               </ListItem>
             </List>
@@ -206,12 +293,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           component="main"
           sx={{
             flexGrow: 1,
-            bgcolor: 'background.default',
+            bgcolor: '#f5f7fa',
             minHeight: '100vh',
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
           }}
         >
           <Toolbar />
-          {children}
+          <Box sx={{ p: 3 }}>
+            {children}
+          </Box>
         </Box>
       </Box>
       <DataTableDialog
